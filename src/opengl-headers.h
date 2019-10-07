@@ -18,7 +18,6 @@
 #endif
 
 #include <GLFW/glfw3.h>
-#include <iostream>
 
 // ///////////////////////////////////////////////////////////////////// //
 #endif //FIRST_PARAGRAPH_OPENGL_HEADERS_H
