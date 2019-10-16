@@ -1,343 +1,364 @@
 // //////////////////////////////////////////////////////////// Includes //
 #include "opengl-headers.h"
 
+#include <exception>
 #include <fstream>
 #include <iostream>
-#include <string>
+#include <sstream>
+#include <vector>
 
-// ///////////////////////////////////////////////////////////////////// //
-static
-void glfwErrorCallback(int const errorNumber,
-                       char const *description) {
-    std::cerr << "GLFW;"
-              << "Error " << errorNumber << "; "
-              << "Description: " << description;
+// ///////////////////////////////////////////////////////////// Structs //
+struct float3 {
+    float x, y, z;
 
-}
+    float3 operator+(float3 a) const {
+        return {x + a.x, y + a.y, z + a.z};
+    }
+
+    float3 operator/(float a) const {
+        return {x / a, y / a, z / a};
+    }
+};
+
+// /////////////////////////////////////////////////////////// Constants //
+unsigned int const WINDOW_WIDTH = 982;
+unsigned int const WINDOW_HEIGHT = 982;
+char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 1 "
+                           "(Trójkąt Sierpińskiego)";
+
+unsigned int const RECURSION_DEPTH_LEVEL_MIN = 0;
+unsigned int const RECURSION_DEPTH_LEVEL_MAX = 8;
+
+std::vector<float3> const TRIANGLE = {{-1.0f, -1.0f, 0.0f},
+                                      {1.0f,  -1.0f, 0.0f},
+                                      {0.0f,  1.0f,  0.0f}};
+
+// /////////////////////////////////////////////////////////// Variables //
+GLFWwindow *window = nullptr;
+
+unsigned int vertexArrayObject;
+unsigned int vertexBufferObject;
 
 int shaderProgram;
 
-void buildAndCompileShaders() {
-    char const *vertexShaderSource =
-            "#version 330 core\n"
-            "layout (location = 0) in vec3 aPos;\n"
-            "void main()\n"
-            "{\n"
-            "   gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);\n"
-            "}\n\0";
+int recursionDepthLevel = 4, previousRecursionDepthLevel = -1;
+ImVec4 fractalColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-    char const *fragmentShaderSource =
-            "#version 330 core\n"
-            "out vec4 FragColor;\n"
-            "void main()\n"
-            "{\n"
-            "   FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);\n"
-            "}\n\0";
+std::vector<float3> sierpinskiTriangle;
 
-    // Vertex shader
-    int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-
-    glShaderSource(vertexShader, 1, &vertexShaderSource, nullptr);
-    glCompileShader(vertexShader);
-
-    // Check for shader compile errors
-    int success;
-    char infoLog[512];
-
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-
-    if (!success) {
-        glGetShaderInfoLog(vertexShader, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::VERTEX::COMPILATION_FAILED\n"
-                  << infoLog
-                  << std::endl;
+// ///////////////////////////////////////////////// Sierpinski triangle //
+std::vector<float3> generateSierpinskiTriangleVertices(
+        std::vector<float3> const &vertices,
+        int const recursionDepth) {
+    if (recursionDepth == 0) {
+        return vertices;
     }
 
-    // fragment shader
-    int fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, nullptr);
-    glCompileShader(fragmentShader);
-
-    // check for shader compile errors
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if (!success) {
-        glGetShaderInfoLog(fragmentShader, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::FRAGMENT::COMPILATION_FAILED\n"
-                  << infoLog << std::endl;
+    std::vector<float3> centerPoints;
+    centerPoints.reserve(3);
+    for (int i = 0; i < 3; i++) {
+        centerPoints.push_back(
+                (vertices[(0 + i) % 3] + vertices[(1 + i) % 3]) / 2.0f);
     }
-    // link shaders
+
+    std::vector<float3> result;
+    for (int i = 0; i < 3; i++) {
+        std::vector<float3> smallerTriangle =
+                generateSierpinskiTriangleVertices(
+                        {
+                                vertices[i],
+                                centerPoints[i],
+                                centerPoints[(i + 2) % 3]
+                        },
+                        recursionDepth - 1);
+        result.insert(std::end(result),
+                      std::begin(smallerTriangle),
+                      std::end(smallerTriangle));
+    }
+
+    return result;
+}
+
+void renderTriangle(std::vector<float3> const &vertices) {
+    int const NUMBER_OF_VERTICES = vertices.size();
+    constexpr int NUMBER_OF_COORDINATES = 3;
+
+    // Fill VBO and VAO
+    glBindVertexArray(vertexArrayObject);
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+        {
+            glBufferData(GL_ARRAY_BUFFER,
+                         NUMBER_OF_VERTICES * sizeof(float3),
+                         vertices.data(),
+                         GL_STATIC_DRAW);
+
+            glVertexAttribPointer(0,
+                                  NUMBER_OF_COORDINATES,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  NUMBER_OF_COORDINATES * sizeof(float),
+                                  nullptr);
+            glEnableVertexAttribArray(0);
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    glBindVertexArray(0);
+
+    // Draw the triangle
+    glBindVertexArray(vertexArrayObject);
+    {
+        glDrawArrays(GL_TRIANGLES, 0, NUMBER_OF_VERTICES);
+    }
+    glBindVertexArray(0);
+}
+
+// ///////////////////////////////////////////////////////////// Shaders //
+void checkForShaderCompileErrors(int const shader) {
+    int compiledSuccessfully;
+
+    constexpr int INFO_LOG_LENGTH = 512;
+    char infoLog[INFO_LOG_LENGTH];
+
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiledSuccessfully);
+
+    if (!compiledSuccessfully) {
+        glGetShaderInfoLog(shader, INFO_LOG_LENGTH,
+                           nullptr, infoLog);
+
+        std::stringstream message;
+        message << "Failed to compile shader!" << std::endl
+                << infoLog;
+        throw std::exception(message.str().c_str());
+    }
+}
+
+void compileShader(int const shader,
+                   std::string const &source) {
+    char const *shaderSourceCode = source.c_str();
+    glShaderSource(shader, 1, &shaderSourceCode, nullptr);
+    glCompileShader(shader);
+
+    checkForShaderCompileErrors(shader);
+}
+
+void checkForShaderLinkingErrors(int const shader) {
+    int linkedSuccessfully;
+
+    constexpr int INFO_LOG_LENGTH = 512;
+    char infoLog[INFO_LOG_LENGTH];
+
+    glGetProgramiv(shader, GL_LINK_STATUS, &linkedSuccessfully);
+
+    if (!linkedSuccessfully) {
+        glGetProgramInfoLog(shader, INFO_LOG_LENGTH,
+                            nullptr, infoLog);
+
+        std::stringstream message;
+        message << "Failed to link shader!" << std::endl
+                << infoLog;
+        throw std::exception(message.str().c_str());
+    }
+}
+
+void linkShaderProgram(int const vertexShader,
+                       int const fragmentShader) {
     shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
-    // check for linking errors
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if (!success) {
-        glGetProgramInfoLog(shaderProgram, 512, nullptr, infoLog);
-        std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n"
-                  << infoLog << std::endl;
+
+    checkForShaderLinkingErrors(shaderProgram);
+}
+
+void createShaderProgram() {
+    int vertexShaderNumber = glCreateShader(GL_VERTEX_SHADER);
+    int fragmentShaderNumber = glCreateShader(GL_FRAGMENT_SHADER);
+
+    std::string const vertexShaderSourceCode =
+            "#version 430 core" "\n"
+            "layout (location = 0) in vec3 inPosition;" "\n"
+            "void main()" "\n"
+            "{" "\n"
+            "    gl_Position = vec4(inPosition, 1.0);" "\n"
+            "}" "\n";
+
+    std::string const fragmentShaderSourceCode =
+            "#version 430 core" "\n"
+            "uniform vec3 uniformColor;" "\n"
+            "out vec4 outColor;" "\n"
+            "void main()" "\n"
+            "{" "\n"
+            "    outColor = vec4(uniformColor, 1.0f);" "\n"
+            "}" "\n";
+
+    compileShader(vertexShaderNumber, vertexShaderSourceCode);
+    compileShader(fragmentShaderNumber, fragmentShaderSourceCode);
+    linkShaderProgram(vertexShaderNumber, fragmentShaderNumber);
+
+    glDeleteShader(fragmentShaderNumber);
+    glDeleteShader(vertexShaderNumber);
+}
+
+// ////////////////////////////////////////////////////// User interface //
+void setupDearImGui() {
+    constexpr char const *GLSL_VERSION = "#version 430";
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(GLSL_VERSION);
+
+    ImGui::StyleColorsLight();
+}
+
+void prepareUserInterfaceWindow() {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    ImGui::Begin("Trojkat Sierpinskiego");
+    {
+        ImGui::SliderInt("Poziom rekurencji",
+                         &recursionDepthLevel,
+                         RECURSION_DEPTH_LEVEL_MIN,
+                         RECURSION_DEPTH_LEVEL_MAX);
+        ImGui::ColorEdit3("Kolor fraktala",
+                          (float *) &fractalColor);
+        ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetWindowSize(ImVec2(375.0f, 88.0f));
     }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
+    ImGui::End();
+    ImGui::Render();
 }
 
-void renderTriangle() {
-    const unsigned int SCR_WIDTH = 800;
-    const unsigned int SCR_HEIGHT = 600;
+// //////////////////////////////////////////////////////// Setup OpenGL //
+void setupGLFW() {
+    glfwSetErrorCallback(
+            [](int const errorNumber,
+               char const *description) {
+                std::cerr << "GLFW;"
+                          << "Error " << errorNumber << "; "
+                          << "Description: " << description;
 
-    buildAndCompileShaders();
-
-    float vertices[] = {
-            -0.5f, -0.5f, 0.0f, // left
-            0.5f, -0.5f, 0.0f, // right
-            0.0f, 0.5f, 0.0f,  // top
-    };
-
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and
-    // then configure vertex attributes(s).
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices,
-                 GL_STATIC_DRAW);
-
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float),
-                          (void *) nullptr);
-    glEnableVertexAttribArray(0);
-
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO
-    // as the vertex attribute's bound vertex buffer object so afterwards we can
-    // safely unbind
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally
-    // modify this VAO, but this rarely happens. Modifying other VAOs requires a
-    // call to glBindVertexArray anyways so we generally don't unbind VAOs (nor
-    // VBOs) when it's not directly necessary.
-    glBindVertexArray(0);
-
-    // uncomment this call to draw in wireframe polygons.
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-
-    // draw our first triangle
-    glUseProgram(shaderProgram);
-    glBindVertexArray(
-            VAO); // seeing as we only have a single VAO there's no need to bind it
-    // every time, but we'll do so to keep things a bit more organized
-    glDrawArrays(GL_TRIANGLES, 0, 3);
-    // glBindVertexArray(0); // no need to unbind it every time
-
-    // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved
-    // etc.)
-    // -------------------------------------------------------------------------------
-    //            glfwSwapBuffers(window);
-    //            glfwPollEvents();
-
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
-    glDeleteVertexArrays(1, &VAO);
-    glDeleteBuffers(1, &VBO);
-}
-
-// //////////////////////////////////////////////////////////////// Main //
-int main(int, char **) {
-    // ------------------------------------------------- Setup window -- //
-    glfwSetErrorCallback(glfwErrorCallback);
-    if (!glfwInit())
-        return 1;
-
-    // Decide GL+GLSL versions
-#if __APPLE__
-    // GL 3.2 + GLSL 150
-    const char *glsl_version = "#version 150";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE); // Required on Mac
-#else
-    // GL 4.3 + GLSL 430
-    const char *glsl_version = "#version 430";
+            });
+    if (!glfwInit()) {
+        throw std::exception("glfwInit error");
+    }
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,
-                   GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT,
-                   GL_TRUE); // 3.0+ only
-#endif
+                   GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+}
 
-    // Create window with graphics context
-    GLFWwindow *window = glfwCreateWindow(
-            1280, 720, "Tomasz Witczak 216920 - zadanie 1", nullptr,
-            nullptr);
+void createWindow() {
+    window = glfwCreateWindow(WINDOW_WIDTH,
+                              WINDOW_HEIGHT,
+                              WINDOW_TITLE,
+                              nullptr,
+                              nullptr);
     if (window == nullptr) {
-        return 1;
+        throw std::exception("glfwCreateWindow error");
     }
-
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
+    glfwSwapInterval(1);          // Enable vertical synchronization
+}
 
-    // Initialize OpenGL loader
+void initializeOpenGLLoader() {
+    bool failedToInitializeOpenGL = false;
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
-    bool err = gl3wInit() != 0;
+    failedToInitializeOpenGL = (gl3wInit() != 0);
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLEW)
-    bool err = glewInit() != GLEW_OK;
+    failedToInitializeOpenGL = (glewInit() != GLEW_OK);
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
-    bool err = !gladLoadGLLoader((GLADloadproc) glfwGetProcAddress);
+    failedToInitializeOpenGL = !gladLoadGLLoader(
+            (GLADloadproc) glfwGetProcAddress);
 #endif
-    if (err) {
-        fprintf(stderr, "Failed to initialize OpenGL loader!\n");
-        return 1;
+    if (failedToInitializeOpenGL) {
+        throw std::exception("Failed to initialize OpenGL loader!");
     }
+}
 
-    // Setup Dear ImGui binding
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void) io;
-    // io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard
-    // Controls io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable
-    // Gamepad Controls
+void createVertexBuffersAndArrays() {
+    glGenVertexArrays(1, &vertexArrayObject);
+    glGenBuffers(1, &vertexBufferObject);
+}
 
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
+void setupOpenGL() {
+    setupGLFW();
+    createWindow();
+    initializeOpenGLLoader();
+    createVertexBuffersAndArrays();
+    createShaderProgram();
+    setupDearImGui();
+}
 
-    // Setup style
-    ImGui::StyleColorsDark();
-    // ImGui::StyleColorsClassic();
+// //////////////////////////////////////////////////////////// Clean up //
+void cleanUp() {
+    glDeleteBuffers(1, &vertexBufferObject);
+    glDeleteVertexArrays(1, &vertexArrayObject);
 
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can
-    // also load multiple fonts and use ImGui::PushFont()/PopFont() to select
-    // them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you
-    // need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return nullptr. Please
-    // handle those errors in your application (e.g. use an assertion, or display
-    // an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored
-    // into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which
-    // ImGui_ImplXXXX_NewFrame below will call.
-    // - Read 'misc/fonts/README.txt' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string
-    // literal you need to write a double backslash \\ !
-    // io.Fonts->AddFontDefault();
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/ProggyTiny.ttf", 10.0f);
-    // ImFont* font =
-    // io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f,
-    // nullptr, io.Fonts->GetGlyphRangesJapanese()); IM_ASSERT(font != nullptr);
-
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    // Main loop
-    while (!glfwWindowShouldClose(window)) {
-        // Poll and handle events (inputs, window resize, etc.)
-        // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to
-        // tell if dear imgui wants to use your inputs.
-        // - When io.WantCaptureMouse is true, do not dispatch mouse input data to
-        // your main application.
-        // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input
-        // data to your main application. Generally you may always pass all inputs
-        // to dear imgui, and hide them from your application based on those two
-        // flags.
-        glfwPollEvents();
-
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        // 1. Show the big demo window (Most of the sample code is in
-        // ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear
-        // ImGui!).
-        //        if (show_demo_window)
-        //            ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair
-        // to created a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin(
-                    "Hello, world!"); // Create a window called "Hello, world!"
-            // and append into it.
-
-            ImGui::Text(
-                    "This is some useful text."); // Display some text (you can
-            // use a format strings too)
-            ImGui::Checkbox(
-                    "Demo Window",
-                    &show_demo_window); // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f,
-                               1.0f); // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3(
-                    "clear color",
-                    (float *) &clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button(
-                    "Button")) // Buttons return true when clicked (most
-                // widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
-                        1000.0f / ImGui::GetIO().Framerate,
-                        ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        //        // 3. Show another simple window.
-        //        if (show_another_window) {
-        //            ImGui::Begin("Another Window",
-        //                         &show_another_window); // Pass a pointer to our
-        //                         bool variable (the window will have a closing
-        //                         button that will clear the bool when clicked)
-        //            ImGui::Text("Hello from another window!");
-        //            if (ImGui::Button("Close Me"))
-        //                show_another_window = false;
-        //            ImGui::End();
-        //        }
-
-        // Rendering
-        ImGui::Render();
-
-        int display_w, display_h;
-        glfwMakeContextCurrent(window);
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-
-        glViewport(0, 0, display_w, display_h);
-        glClearColor(clear_color.x, clear_color.y, clear_color.z,
-                     clear_color.w);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        renderTriangle();
-
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        glfwMakeContextCurrent(window);
-        glfwSwapBuffers(window);
-    }
-
-    // Cleanup
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
     glfwDestroyWindow(window);
     glfwTerminate();
+}
 
+// /////////////////////////////////////////////////////////// Main loop //
+void performMainLoop() {
+    while (!glfwWindowShouldClose(window)) {
+        // --------------------------------------------------- Events -- //
+        glfwPollEvents();
+
+        // ----------------------------------- Get current frame size -- //
+        int displayWidth, displayHeight;
+        glfwMakeContextCurrent(window);
+        glfwGetFramebufferSize(window, &displayWidth, &displayHeight);
+
+        // ------------------------------------------- Clear viewport -- //
+        glViewport(0, 0, displayWidth, displayHeight);
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        // ------------------------------ Set fractal color in shader -- //
+        glUseProgram(shaderProgram);
+        glUniform3f(glGetUniformLocation(shaderProgram, "uniformColor"),
+                    fractalColor.x, fractalColor.y, fractalColor.z);
+
+        // ------------------------------------------ Render triangle -- //
+        if (recursionDepthLevel != previousRecursionDepthLevel) {
+            sierpinskiTriangle =
+                    generateSierpinskiTriangleVertices(TRIANGLE,
+                                                       recursionDepthLevel);
+            previousRecursionDepthLevel = recursionDepthLevel;
+        }
+        renderTriangle(sierpinskiTriangle);
+
+        // ------------------------------------------------------- UI -- //
+        prepareUserInterfaceWindow();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        // -------------------------------------------- Update screen -- //
+        glfwMakeContextCurrent(window);
+        glfwSwapBuffers(window);
+    }
+}
+
+// //////////////////////////////////////////////////////////////// Main //
+int main() {
+    try {
+        setupOpenGL();
+        performMainLoop();
+        cleanUp();
+    }
+    catch (std::exception const &exception) {
+        std::cerr << exception.what();
+        return 1;
+    }
     return 0;
 }
+
+// ///////////////////////////////////////////////////////////////////// //
