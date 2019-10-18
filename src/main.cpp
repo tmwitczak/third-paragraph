@@ -33,10 +33,22 @@ char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 2 "
 unsigned int const RECURSION_DEPTH_LEVEL_MIN = 0;
 unsigned int const RECURSION_DEPTH_LEVEL_MAX = 8;
 
-std::vector<Vertex> const TRIANGLE
-        = {{-1.0f, -1.0f, 0.0f, 0.0f, 0.0f},
-           {1.0f,  -1.0f, 0.0f, 1.0f, 0.0f},
-           {0.0f,  1.0f,  0.0f, 0.5f, 1.0f}};
+std::vector<Vertex> const PYRAMID
+        = {{-1.0f, -1.0f, 1.0f,  0.0f, 0.0f}, // front
+           {1.0f,  -1.0f, 1.0f,  1.0f, 0.0f},
+           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+
+           {0.0f,  -1.0f, -1.0f, 0.0f, 0.0f}, // left
+           {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
+           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+
+           {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f}, // right
+           {0.0f,  -1.0f, -1.0f, 1.0f, 0.0f},
+           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+
+           {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f}, // bottom
+           {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
+           {0.0f,  -1.0f, -1.0f, 0.5f, 1.0f}};
 
 
 // /////////////////////////////////////////////////////////// Variables //
@@ -48,46 +60,118 @@ unsigned int vertexBufferObject2;
 
 unsigned int texture;
 
+float angleX = 0.0f;
+float angleY = 0.0f;
+float angleZ = 0.0f;
+
 int shaderProgram;
 
 int recursionDepthLevel = 4, previousRecursionDepthLevel = -1;
-ImVec4 fractalColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
+ImVec4 fractalColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 
 std::vector<Vertex> sierpinskiTriangle;
 
 // ///////////////////////////////////////////////// Sierpinski triangle //
-std::vector<Vertex> generateSierpinskiTriangleVertices(
-        std::vector<Vertex> const &vertices,
+std::vector<Vertex> generateSierpinskiPyramidVertices(
+        std::vector<Vertex> vertices,
         int const recursionDepth) {
     if (recursionDepth == 0) {
+        for (int i = 0; i < 3 * 4; i++) {
+            vertices[i].u = PYRAMID[i].u;
+            vertices[i].v = PYRAMID[i].v;
+        }
         return vertices;
     }
 
     std::vector<Vertex> centerPoints;
-    centerPoints.reserve(3);
-    for (int i = 0; i < 3; i++) {
+    centerPoints.reserve(3 * 4);
+    for (int i = 0; i < 3 * 4; i++) {
+        int start = 3 * (i / 3);
         centerPoints.push_back(
-                (vertices[(0 + i) % 3] + vertices[(1 + i) % 3]) / 2.0f);
+                (vertices[(0 + i) % 3 + start]
+                 + vertices[(1 + i) % 3 + start]) / 2.0f);
     }
 
     std::vector<Vertex> result;
-    for (int i = 0; i < 3; i++) {
-        std::vector<Vertex> smallerTriangle =
-                generateSierpinskiTriangleVertices(
-                        {vertices[i],
-                         centerPoints[i],
-                         centerPoints[(i + 2) % 3]},
+    for (int i = 0; i < 2; i++) {
+        std::vector<Vertex> smallerPyramid =
+                generateSierpinskiPyramidVertices(
+                        {
+                                vertices[(3 * i + 0) % 12],
+                                centerPoints[(3 * i + 0) % 12],
+                                centerPoints[(3 * i + 2) % 12],
+
+                                centerPoints[(3 * i + 3) % 12],
+                                vertices[(3 * i + 4) % 12],
+                                centerPoints[(3 * i + 4) % 12],
+
+                                centerPoints[(3 * i + 0) % 12],
+                                centerPoints[(3 * i + 3) % 12],
+                                centerPoints[(3 * i + 2) % 12],
+
+                                vertices[(3 * i + 0) % 12],
+                                centerPoints[(3 * i + 3) % 12],
+                                centerPoints[(3 * i + 0) % 12],
+                        },
                         recursionDepth - 1);
 
-        for (int j = 0; j < 3; j++) {
-            smallerTriangle[j].u = TRIANGLE[j].u;
-            smallerTriangle[j].v = TRIANGLE[j].v;
-        }
 
         result.insert(std::end(result),
-                      std::begin(smallerTriangle),
-                      std::end(smallerTriangle));
+                      std::begin(smallerPyramid),
+                      std::end(smallerPyramid));
     }
+
+    std::vector<Vertex> smallerPyramid =
+            generateSierpinskiPyramidVertices(
+                    {
+                            centerPoints[0],
+                            vertices[1],
+                            centerPoints[1],
+
+                            centerPoints[6],
+                            centerPoints[0],
+                            centerPoints[1],
+
+                            vertices[1],
+                            centerPoints[6],
+                            centerPoints[8],
+
+                            vertices[1],
+                            centerPoints[0],
+                            centerPoints[6],
+                    },
+                    recursionDepth - 1);
+
+
+    result.insert(std::end(result),
+                  std::begin(smallerPyramid),
+                  std::end(smallerPyramid));
+
+    smallerPyramid =
+            generateSierpinskiPyramidVertices(
+                    {
+                            centerPoints[2],
+                            centerPoints[1],
+                            vertices[2],
+
+                            centerPoints[5],
+                            centerPoints[4],
+                            vertices[5],
+
+                            centerPoints[8],
+                            centerPoints[7],
+                            vertices[8],
+
+                            centerPoints[2],
+                            centerPoints[5],
+                            centerPoints[1],
+                    },
+                    recursionDepth - 1);
+
+
+    result.insert(std::end(result),
+                  std::begin(smallerPyramid),
+                  std::end(smallerPyramid));
 
     return result;
 }
@@ -104,7 +188,8 @@ void renderTriangle(std::vector<Vertex> const
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
         {
             glBufferData(GL_ARRAY_BUFFER,
-                         NUMBER_OF_VERTICES * sizeof(Vertex),
+                         NUMBER_OF_VERTICES *
+                         sizeof(Vertex),
                          vertices.data(),
                          GL_STATIC_DRAW);
 
@@ -120,7 +205,8 @@ void renderTriangle(std::vector<Vertex> const
                                   GL_FLOAT,
                                   GL_FALSE,
                                   5 * sizeof(float),
-                                  (void *) (3 * sizeof(float)));
+                                  (void *) (3 *
+                                            sizeof(float)));
             glEnableVertexAttribArray(1);
         }
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -128,6 +214,7 @@ void renderTriangle(std::vector<Vertex> const
     glBindVertexArray(0);
 
     // Draw the triangle
+    glEnable(GL_DEPTH_TEST);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glBindVertexArray(vertexArrayObject);
@@ -142,11 +229,15 @@ void generateTextures() {
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
     {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                        GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                        GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D,
+                        GL_TEXTURE_MIN_FILTER,
                         GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+        glTexParameteri(GL_TEXTURE_2D,
+                        GL_TEXTURE_MAG_FILTER,
                         GL_LINEAR);
 
         int width, height, numberOfChannels;
@@ -156,9 +247,11 @@ void generateTextures() {
                 &width, &height,
                 &numberOfChannels, 0);
         if (textureData == nullptr) {
-            throw std::exception("Failed to load texture!");
+            throw std::exception(
+                    "Failed to load texture!");
         }
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width,
+                     height, 0,
                      GL_RGB,
                      GL_UNSIGNED_BYTE, textureData);
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -174,7 +267,8 @@ void checkForShaderCompileErrors(int const shader) {
     constexpr int INFO_LOG_LENGTH = 512;
     char infoLog[INFO_LOG_LENGTH];
 
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiledSuccessfully);
+    glGetShaderiv(shader, GL_COMPILE_STATUS,
+                  &compiledSuccessfully);
 
     if (!compiledSuccessfully) {
         glGetShaderInfoLog(shader, INFO_LOG_LENGTH,
@@ -202,7 +296,8 @@ void checkForShaderLinkingErrors(int const shader) {
     constexpr int INFO_LOG_LENGTH = 512;
     char infoLog[INFO_LOG_LENGTH];
 
-    glGetProgramiv(shader, GL_LINK_STATUS, &linkedSuccessfully);
+    glGetProgramiv(shader, GL_LINK_STATUS,
+                   &linkedSuccessfully);
 
     if (!linkedSuccessfully) {
         glGetProgramInfoLog(shader, INFO_LOG_LENGTH,
@@ -226,17 +321,20 @@ void linkShaderProgram(int const vertexShader,
 }
 
 void createShaderProgram() {
-    int vertexShaderNumber = glCreateShader(GL_VERTEX_SHADER);
-    int fragmentShaderNumber = glCreateShader(GL_FRAGMENT_SHADER);
+    int vertexShaderNumber = glCreateShader(
+            GL_VERTEX_SHADER);
+    int fragmentShaderNumber = glCreateShader(
+            GL_FRAGMENT_SHADER);
 
     std::string const vertexShaderSourceCode =
             "#version 430 core" "\n"
             "layout (location = 0) in vec3 inPosition;" "\n"
             "layout (location = 1) in vec2 inTextureCoordinates;" "\n"
             "out vec2 texCoord;" "\n"
+            "uniform mat4 transform;" "\n"
             "void main()" "\n"
             "{" "\n"
-            "    gl_Position = vec4(inPosition, 1.0);" "\n"
+            "    gl_Position = transform * vec4(inPosition, 1.0);" "\n"
             "    texCoord = inTextureCoordinates;" "\n"
             "}" "\n";
 
@@ -249,12 +347,15 @@ void createShaderProgram() {
             "void main()" "\n"
             "{" "\n"
             "    outColor = texture(uniformTexture, " "\n"
-            "                   texCoord);" "\n"
+            "                   texCoord) * vec4(uniformColor,1);" "\n"
             "}" "\n";
 
-    compileShader(vertexShaderNumber, vertexShaderSourceCode);
-    compileShader(fragmentShaderNumber, fragmentShaderSourceCode);
-    linkShaderProgram(vertexShaderNumber, fragmentShaderNumber);
+    compileShader(vertexShaderNumber,
+                  vertexShaderSourceCode);
+    compileShader(fragmentShaderNumber,
+                  fragmentShaderSourceCode);
+    linkShaderProgram(vertexShaderNumber,
+                      fragmentShaderNumber);
 
     glDeleteShader(fragmentShaderNumber);
     glDeleteShader(vertexShaderNumber);
@@ -285,8 +386,11 @@ void prepareUserInterfaceWindow() {
                          RECURSION_DEPTH_LEVEL_MAX);
         ImGui::ColorEdit3("Kolor fraktala",
                           (float *) &fractalColor);
+        ImGui::SliderAngle("Obrot X", &angleX);
+        ImGui::SliderAngle("Obrot Y", &angleY);
+        ImGui::SliderAngle("Obrot Z", &angleZ);
         ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetWindowSize(ImVec2(375.0f, 88.0f));
+        ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
     }
     ImGui::End();
     ImGui::Render();
@@ -298,8 +402,10 @@ void setupGLFW() {
             [](int const errorNumber,
                char const *description) {
                 std::cerr << "GLFW;"
-                          << "Error " << errorNumber << "; "
-                          << "Description: " << description;
+                          << "Error " << errorNumber
+                          << "; "
+                          << "Description: "
+                          << description;
 
             });
     if (!glfwInit()) {
@@ -322,7 +428,8 @@ void createWindow() {
         throw std::exception("glfwCreateWindow error");
     }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(1);          // Enable vertical synchronization
+    glfwSwapInterval(
+            1);          // Enable vertical synchronization
 }
 
 void initializeOpenGLLoader() {
@@ -336,7 +443,8 @@ void initializeOpenGLLoader() {
             (GLADloadproc) glfwGetProcAddress);
 #endif
     if (failedToInitializeOpenGL) {
-        throw std::exception("Failed to initialize OpenGL loader!");
+        throw std::exception(
+                "Failed to initialize OpenGL loader!");
     }
 }
 
@@ -379,34 +487,66 @@ void performMainLoop() {
         // ----------------------------------- Get current frame size -- //
         int displayWidth, displayHeight;
         glfwMakeContextCurrent(window);
-        glfwGetFramebufferSize(window, &displayWidth, &displayHeight);
+        glfwGetFramebufferSize(window, &displayWidth,
+                               &displayHeight);
 
         // ------------------------------------------- Clear viewport -- //
+        glm::mat4 trans = glm::mat4(1.0f);
+        glm::mat4 projection = //glm::ortho(-3.0f, 3.0f, -3.0f, 3.0f, 0.01f, 200.0f);
+                glm::perspective(glm::radians(30.0f),
+                                 ((float) displayWidth) /
+                                 (float) displayHeight,
+                                 0.01f, 100.0f);
+        glm::mat4 view = glm::lookAt(glm::vec3(0.0f, 0.0f, 50.0f),
+                                     glm::vec3(0.0f, 0.0f, 0.0f),
+                                     glm::vec3(0.0f, 1.0f, 0.0f));
+        trans = projection * view *
+                (glm::rotate(glm::mat4(1.0f), angleZ,
+                             glm::vec3(0.0, 0.0, 1.0)) *
+                 glm::rotate(glm::mat4(1.0f), angleY,
+                             glm::vec3(0.0, 1.0, 0.0)) *
+                 glm::rotate(glm::mat4(1.0f), angleX,
+                             glm::vec3(1.0, 0.0, 0.0)) *
+                             glm::scale(glm::mat4(1.0f), glm::vec3(7.5f)));
+        //        trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
+//        glEnable(GL_CULL_FACE);
+//        glCullFace(GL_BACK);
+//        glFrontFace(GL_CCW);
         glViewport(0, 0, displayWidth, displayHeight);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // ------------------------------ Set fractal color in shader -- //
         glUseProgram(shaderProgram);
+        glUniformMatrix4fv(
+                glGetUniformLocation(shaderProgram,
+                                     "transform"),
+                1, GL_FALSE, glm::value_ptr(trans));
         glUniform3f(
-                glGetUniformLocation(shaderProgram, "uniformColor"),
-                fractalColor.x, fractalColor.y, fractalColor.z);
+                glGetUniformLocation(shaderProgram,
+                                     "uniformColor"),
+                fractalColor.x, fractalColor.y,
+                fractalColor.z);
         glUniform1i(
-                glGetUniformLocation(shaderProgram, "uniformTexture"),
+                glGetUniformLocation(shaderProgram,
+                                     "uniformTexture"),
                 0);
 
         // ------------------------------------------ Render triangle -- //
-        if (recursionDepthLevel != previousRecursionDepthLevel) {
+        if (recursionDepthLevel !=
+            previousRecursionDepthLevel) {
             sierpinskiTriangle =
-                    generateSierpinskiTriangleVertices(TRIANGLE,
-                                                       recursionDepthLevel);
+                    generateSierpinskiPyramidVertices(
+                            PYRAMID,
+                            recursionDepthLevel);
             previousRecursionDepthLevel = recursionDepthLevel;
         }
         renderTriangle(sierpinskiTriangle);
 
         // ------------------------------------------------------- UI -- //
         prepareUserInterfaceWindow();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        ImGui_ImplOpenGL3_RenderDrawData(
+                ImGui::GetDrawData());
 
         // -------------------------------------------- Update screen -- //
         glfwMakeContextCurrent(window);
