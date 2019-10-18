@@ -5,72 +5,85 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <tuple>
 #include <vector>
 
 // ///////////////////////////////////////////////////////////// Structs //
-struct float3 {
-    float x, y, z;
+struct Vertex {
+    float x, y, z, u, v;
 
-    float3 operator+(float3 a) const {
-        return {x + a.x, y + a.y, z + a.z};
+    Vertex(float a, float b, float c, float d, float e)
+            : x(a), y(b), z(c), u(d), v(e) {}
+
+    Vertex operator+(Vertex const &a) const {
+        return {x + a.x, y + a.y, z + a.z, u + a.u, v + a.v};
     }
 
-    float3 operator/(float a) const {
-        return {x / a, y / a, z / a};
+    Vertex operator/(float const a) const {
+        return {x / a, y / a, z / a, u / a, v / a};
     }
 };
 
 // /////////////////////////////////////////////////////////// Constants //
 unsigned int const WINDOW_WIDTH = 982;
 unsigned int const WINDOW_HEIGHT = 982;
-char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 1 "
-                           "(Trójkąt Sierpińskiego)";
+char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 2 "
+                           "(Piramida Sierpińskiego)";
 
 unsigned int const RECURSION_DEPTH_LEVEL_MIN = 0;
 unsigned int const RECURSION_DEPTH_LEVEL_MAX = 8;
 
-std::vector<float3> const TRIANGLE = {{-1.0f, -1.0f, 0.0f},
-                                      {1.0f,  -1.0f, 0.0f},
-                                      {0.0f,  1.0f,  0.0f}};
+std::vector<Vertex> const TRIANGLE
+        = {{-1.0f, -1.0f, 0.0f, 0.0f, 0.0f},
+           {1.0f,  -1.0f, 0.0f, 1.0f, 0.0f},
+           {0.0f,  1.0f,  0.0f, 0.5f, 1.0f}};
+
 
 // /////////////////////////////////////////////////////////// Variables //
 GLFWwindow *window = nullptr;
 
 unsigned int vertexArrayObject;
 unsigned int vertexBufferObject;
+unsigned int vertexBufferObject2;
+
+unsigned int texture;
 
 int shaderProgram;
 
 int recursionDepthLevel = 4, previousRecursionDepthLevel = -1;
 ImVec4 fractalColor = ImVec4(0.0f, 0.0f, 0.0f, 0.0f);
 
-std::vector<float3> sierpinskiTriangle;
+std::vector<Vertex> sierpinskiTriangle;
 
 // ///////////////////////////////////////////////// Sierpinski triangle //
-std::vector<float3> generateSierpinskiTriangleVertices(
-        std::vector<float3> const &vertices,
+std::vector<Vertex> generateSierpinskiTriangleVertices(
+        std::vector<Vertex> const &vertices,
         int const recursionDepth) {
     if (recursionDepth == 0) {
         return vertices;
     }
 
-    std::vector<float3> centerPoints;
+    std::vector<Vertex> centerPoints;
     centerPoints.reserve(3);
     for (int i = 0; i < 3; i++) {
         centerPoints.push_back(
                 (vertices[(0 + i) % 3] + vertices[(1 + i) % 3]) / 2.0f);
     }
 
-    std::vector<float3> result;
+    std::vector<Vertex> result;
     for (int i = 0; i < 3; i++) {
-        std::vector<float3> smallerTriangle =
+        std::vector<Vertex> smallerTriangle =
                 generateSierpinskiTriangleVertices(
-                        {
-                                vertices[i],
-                                centerPoints[i],
-                                centerPoints[(i + 2) % 3]
-                        },
+                        {vertices[i],
+                         centerPoints[i],
+                         centerPoints[(i + 2) % 3]},
                         recursionDepth - 1);
+
+        for (int j = 0; j < 3; j++) {
+            smallerTriangle[j].u = TRIANGLE[j].u;
+            smallerTriangle[j].v = TRIANGLE[j].v;
+        }
+
         result.insert(std::end(result),
                       std::begin(smallerTriangle),
                       std::end(smallerTriangle));
@@ -79,9 +92,11 @@ std::vector<float3> generateSierpinskiTriangleVertices(
     return result;
 }
 
-void renderTriangle(std::vector<float3> const &vertices) {
+void renderTriangle(std::vector<Vertex> const
+                    &vertices) {
     int const NUMBER_OF_VERTICES = vertices.size();
     constexpr int NUMBER_OF_COORDINATES = 3;
+    constexpr int NUMBER_OF_COORDINATES_UV = 2;
 
     // Fill VBO and VAO
     glBindVertexArray(vertexArrayObject);
@@ -89,29 +104,68 @@ void renderTriangle(std::vector<float3> const &vertices) {
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
         {
             glBufferData(GL_ARRAY_BUFFER,
-                         NUMBER_OF_VERTICES * sizeof(float3),
+                         NUMBER_OF_VERTICES * sizeof(Vertex),
                          vertices.data(),
                          GL_STATIC_DRAW);
 
             glVertexAttribPointer(0,
-                                  NUMBER_OF_COORDINATES,
+                                  3,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  NUMBER_OF_COORDINATES * sizeof(float),
+                                  5 * sizeof(float),
                                   nullptr);
             glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1,
+                                  2,
+                                  GL_FLOAT,
+                                  GL_FALSE,
+                                  5 * sizeof(float),
+                                  (void *) (3 * sizeof(float)));
+            glEnableVertexAttribArray(1);
         }
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
     glBindVertexArray(0);
 
     // Draw the triangle
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
     glBindVertexArray(vertexArrayObject);
     {
         glDrawArrays(GL_TRIANGLES, 0, NUMBER_OF_VERTICES);
     }
     glBindVertexArray(0);
 }
+
+// //////////////////////////////////////////////////////////// Textures //
+void generateTextures() {
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
+                        GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
+                        GL_LINEAR);
+
+        int width, height, numberOfChannels;
+        stbi_set_flip_vertically_on_load(true);
+        unsigned char *textureData = stbi_load(
+                "res/textures/triangle.jpg",
+                &width, &height,
+                &numberOfChannels, 0);
+        if (textureData == nullptr) {
+            throw std::exception("Failed to load texture!");
+        }
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0,
+                     GL_RGB,
+                     GL_UNSIGNED_BYTE, textureData);
+        glGenerateMipmap(GL_TEXTURE_2D);
+        stbi_image_free(textureData);
+    }
+}
+
 
 // ///////////////////////////////////////////////////////////// Shaders //
 void checkForShaderCompileErrors(int const shader) {
@@ -178,18 +232,24 @@ void createShaderProgram() {
     std::string const vertexShaderSourceCode =
             "#version 430 core" "\n"
             "layout (location = 0) in vec3 inPosition;" "\n"
+            "layout (location = 1) in vec2 inTextureCoordinates;" "\n"
+            "out vec2 texCoord;" "\n"
             "void main()" "\n"
             "{" "\n"
             "    gl_Position = vec4(inPosition, 1.0);" "\n"
+            "    texCoord = inTextureCoordinates;" "\n"
             "}" "\n";
 
     std::string const fragmentShaderSourceCode =
             "#version 430 core" "\n"
             "uniform vec3 uniformColor;" "\n"
+            "uniform sampler2D uniformTexture;" "\n"
+            "in vec2 texCoord;" "\n"
             "out vec4 outColor;" "\n"
             "void main()" "\n"
             "{" "\n"
-            "    outColor = vec4(uniformColor, 1.0f);" "\n"
+            "    outColor = texture(uniformTexture, " "\n"
+            "                   texCoord);" "\n"
             "}" "\n";
 
     compileShader(vertexShaderNumber, vertexShaderSourceCode);
@@ -283,6 +343,7 @@ void initializeOpenGLLoader() {
 void createVertexBuffersAndArrays() {
     glGenVertexArrays(1, &vertexArrayObject);
     glGenBuffers(1, &vertexBufferObject);
+    glGenBuffers(1, &vertexBufferObject2);
 }
 
 void setupOpenGL() {
@@ -290,12 +351,14 @@ void setupOpenGL() {
     createWindow();
     initializeOpenGLLoader();
     createVertexBuffersAndArrays();
+    generateTextures();
     createShaderProgram();
     setupDearImGui();
 }
 
 // //////////////////////////////////////////////////////////// Clean up //
 void cleanUp() {
+    glDeleteBuffers(1, &vertexBufferObject2);
     glDeleteBuffers(1, &vertexBufferObject);
     glDeleteVertexArrays(1, &vertexArrayObject);
 
@@ -325,8 +388,12 @@ void performMainLoop() {
 
         // ------------------------------ Set fractal color in shader -- //
         glUseProgram(shaderProgram);
-        glUniform3f(glGetUniformLocation(shaderProgram, "uniformColor"),
-                    fractalColor.x, fractalColor.y, fractalColor.z);
+        glUniform3f(
+                glGetUniformLocation(shaderProgram, "uniformColor"),
+                fractalColor.x, fractalColor.y, fractalColor.z);
+        glUniform1i(
+                glGetUniformLocation(shaderProgram, "uniformTexture"),
+                0);
 
         // ------------------------------------------ Render triangle -- //
         if (recursionDepthLevel != previousRecursionDepthLevel) {

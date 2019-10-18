@@ -1,5 +1,5 @@
-#ifndef FIRST_PARAGRAPH_OPENGL_HEADERS_H
-#define FIRST_PARAGRAPH_OPENGL_HEADERS_H
+#ifndef SECOND_PARAGRAPH_OPENGL_HEADERS_H
+#define SECOND_PARAGRAPH_OPENGL_HEADERS_H
 // //////////////////////////////////////////////////////////// Includes //
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -25,5 +25,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include "stb_image.h"
+
 // ///////////////////////////////////////////////////////////////////// //
-#endif // FIRST_PARAGRAPH_OPENGL_HEADERS_H
+#endif // SECOND_PARAGRAPH_OPENGL_HEADERS_H
