@@ -2,6 +2,7 @@
 #include "opengl-headers.h"
 
 #include <array>
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <iostream>
@@ -67,24 +68,24 @@ int const RECURSION_DEPTH_LEVEL_MAX = 8;
 
 vector<Vertex> const BASE_PYRAMID = {
         // Front triangle
-        {-1.0f, -1.0f, 1.0f,  0.0f, 0.0f},
-        {1.0f,  -1.0f, 1.0f,  1.0f, 0.0f},
-        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
+        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
+        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
 
         // Left triangle
-        {0.0f,  -1.0f, -1.0f, 0.0f, 0.0f},
-        {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
-        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   0.0f, 0.0f},
+        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
+        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
 
         // Right triangle
-        {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f},
-        {0.0f,  -1.0f, -1.0f, 1.0f, 0.0f},
-        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
+        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   1.0f, 0.0f},
+        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
 
         // Bottom triangle
-        {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f},
-        {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
-        {0.0f,  -1.0f, -1.0f, 0.5f, 1.0f}};
+        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
+        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
+        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   0.5f, 1.0f}};
 
 // /////////////////////////////////////////////////////////// Variables //
 // ----------------------------------------------------------- Window -- //
@@ -102,8 +103,7 @@ unsigned int texture;
 
 // -------------------------------------- Pyramid rotation parameters -- //
 float pyramidRotationAngleX = 0.0f,
-        pyramidRotationAngleY = 0.0f,
-        pyramidRotationAngleZ = 0.0f;
+        pyramidRotationAngleY = 0.0f;
 
 // ----------------------------------------------------------- Colors -- //
 ImVec4 fractalColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -405,9 +405,8 @@ void prepareUserInterfaceWindow() {
                          RECURSION_DEPTH_LEVEL_MAX);
         ImGui::ColorEdit3("Kolor fraktala",
                           (float *) &fractalColor);
-        ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX);
-        ImGui::SliderAngle("Obrot Y", &pyramidRotationAngleY);
-        ImGui::SliderAngle("Obrot Z", &pyramidRotationAngleZ);
+        ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX, 0.0f, 360.0f);
+        ImGui::SliderAngle("Obrot Y", &pyramidRotationAngleY, 0.0f, 360.0f);
         ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
         ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
     }
@@ -509,20 +508,19 @@ void performMainLoop() {
         // -------------------------------- Calculate transformations -- //
         mat4 const identity = mat4(1.0f);
 
-        mat4 const projection = perspective(radians(30.0f),
-                            ((float) displayWidth) / (float) displayHeight,
+        mat4 const projection = perspective(radians(60.0f),
+                            ((float) displayWidth) / ((float) displayHeight),
                             0.01f, 100.0f);
 
-        mat4 const view = lookAt(vec3(0.0f, 0.0f, 50.0f),
+        mat4 const view = lookAt(vec3(0.0f, 0.0f, 2.5f),
                                  vec3(0.0f, 0.0f, 0.0f),
                                  vec3(0.0f, 1.0f, 0.0f));
 
-        mat4 const local = rotate(identity, pyramidRotationAngleZ, vec3(0.0, 0.0, 1.0))
-                         * rotate(identity, pyramidRotationAngleY, vec3(0.0, 1.0, 0.0))
-                         * rotate(identity, pyramidRotationAngleX, vec3(1.0, 0.0, 0.0))
-                         * scale(identity, vec3(7.5f));
+        mat4 model = identity;
+        model = rotate(model, pyramidRotationAngleX, vec3(1.0, 0.0, 0.0));
+        model = rotate(model, pyramidRotationAngleY, vec3(0.0, 1.0, 0.0));
 
-        mat4 const transformation = projection * view * local;
+        mat4 const transformation = projection * view * model;
 
         // ------------------------------------------- Clear viewport -- //
         glViewport(0, 0, displayWidth, displayHeight);
