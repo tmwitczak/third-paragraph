@@ -8,48 +8,77 @@
 #include <tuple>
 #include <vector>
 
-// ///////////////////////////////////////////////////////////// Structs //
+// ////////////////////////////////////////////////////// Struct: Vertex //
 struct Vertex {
-    float x, y, z, u, v;
+    // ========================================================= Data == //
+    // -------------------------------------------------- Position -- == //
+    float x, y, z;
 
-    Vertex(float a, float b, float c, float d, float e)
-            : x(a), y(b), z(c), u(d), v(e) {}
+    // --------------------------------------------------- Texture -- == //
+    float u, v;
 
-    Vertex operator+(Vertex const &a) const {
-        return {x + a.x, y + a.y, z + a.z, u + a.u, v + a.v};
+    // ==================================================== Behaviour == //
+    // ----------------------------------------------- Constructor -- == //
+//    Vertex(float const positionX,
+//           float const positionY,
+//           float const positionZ,
+//           float const textureU,
+//           float const textureV)
+//            : x(positionX),
+//              y(positionY),
+//              z(positionZ),
+//              u(textureU),
+//              v(textureV) {
+//    }
+
+    // ------------------------------------------------- Operators -- == //
+    Vertex operator+(Vertex const &vertex) const {
+        return {x + vertex.x,
+                y + vertex.y,
+                z + vertex.z,
+                u + vertex.u,
+                v + vertex.v};
     }
 
-    Vertex operator/(float const a) const {
-        return {x / a, y / a, z / a, u / a, v / a};
+    Vertex operator/(float const divisor) const {
+        return {x / divisor,
+                y / divisor,
+                z / divisor,
+                u / divisor,
+                v / divisor};
     }
 };
 
 // /////////////////////////////////////////////////////////// Constants //
-unsigned int const WINDOW_WIDTH = 982;
-unsigned int const WINDOW_HEIGHT = 982;
-char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 2 "
-                           "(Piramida Sierpińskiego)";
+int const WINDOW_WIDTH = 982;
+int const WINDOW_HEIGHT = 982;
+char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 2"
+                           " (Piramida Sierpińskiego)";
 
-unsigned int const RECURSION_DEPTH_LEVEL_MIN = 0;
-unsigned int const RECURSION_DEPTH_LEVEL_MAX = 8;
+int const RECURSION_DEPTH_LEVEL_MIN = 0;
+int const RECURSION_DEPTH_LEVEL_MAX = 8;
 
-std::vector<Vertex> const PYRAMID
-        = {{-1.0f, -1.0f, 1.0f,  0.0f, 0.0f}, // front
-           {1.0f,  -1.0f, 1.0f,  1.0f, 0.0f},
-           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+std::vector<Vertex> const PYRAMID = {
+        // Front
+        {-1.0f, -1.0f, 1.0f,  0.0f, 0.0f},
+        {1.0f,  -1.0f, 1.0f,  1.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
 
-           {0.0f,  -1.0f, -1.0f, 0.0f, 0.0f}, // left
-           {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
-           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+        // Left
+        {0.0f,  -1.0f, -1.0f, 0.0f, 0.0f},
+        {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
 
-           {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f}, // right
-           {0.0f,  -1.0f, -1.0f, 1.0f, 0.0f},
-           {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
+        // Right
+        {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f},
+        {0.0f,  -1.0f, -1.0f, 1.0f, 0.0f},
+        {0.0f,  1.0f,  0.0f,  0.5f, 1.0f},
 
-           {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f}, // bottom
-           {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
-           {0.0f,  -1.0f, -1.0f, 0.5f, 1.0f}};
-
+        // Bottom
+        {1.0f,  -1.0f, 1.0f,  0.0f, 0.0f},
+        {-1.0f, -1.0f, 1.0f,  1.0f, 0.0f},
+        {0.0f,  -1.0f, -1.0f, 0.5f, 1.0f}
+};
 
 // /////////////////////////////////////////////////////////// Variables //
 GLFWwindow *window = nullptr;
@@ -88,8 +117,8 @@ std::vector<Vertex> generateSierpinskiPyramidVertices(
     for (int i = 0; i < 3 * 4; i++) {
         int start = 3 * (i / 3);
         centerPoints.push_back(
-                (vertices[(0 + i) % 3 + start]
-                 + vertices[(1 + i) % 3 + start]) / 2.0f);
+                (vertices[(0 + i) % 3 + start] +
+                 vertices[(1 + i) % 3 + start]) / 2.0f);
     }
 
     std::vector<Vertex> result;
@@ -114,7 +143,6 @@ std::vector<Vertex> generateSierpinskiPyramidVertices(
                                 centerPoints[(3 * i + 0) % 12],
                         },
                         recursionDepth - 1);
-
 
         result.insert(std::end(result),
                       std::begin(smallerPyramid),
@@ -142,7 +170,6 @@ std::vector<Vertex> generateSierpinskiPyramidVertices(
                     },
                     recursionDepth - 1);
 
-
     result.insert(std::end(result),
                   std::begin(smallerPyramid),
                   std::end(smallerPyramid));
@@ -167,7 +194,6 @@ std::vector<Vertex> generateSierpinskiPyramidVertices(
                             centerPoints[1],
                     },
                     recursionDepth - 1);
-
 
     result.insert(std::end(result),
                   std::begin(smallerPyramid),
@@ -259,7 +285,6 @@ void generateTextures() {
     }
 }
 
-
 // ///////////////////////////////////////////////////////////// Shaders //
 void checkForShaderCompileErrors(int const shader) {
     int compiledSuccessfully;
@@ -327,28 +352,48 @@ void createShaderProgram() {
             GL_FRAGMENT_SHADER);
 
     std::string const vertexShaderSourceCode =
-            "#version 430 core" "\n"
-            "layout (location = 0) in vec3 inPosition;" "\n"
-            "layout (location = 1) in vec2 inTextureCoordinates;" "\n"
-            "out vec2 texCoord;" "\n"
-            "uniform mat4 transform;" "\n"
-            "void main()" "\n"
-            "{" "\n"
-            "    gl_Position = transform * vec4(inPosition, 1.0);" "\n"
-            "    texCoord = inTextureCoordinates;" "\n"
-            "}" "\n";
+            "#version 430 core"
+            "\n"
+            "layout (location = 0) in vec3 inPosition;"
+            "\n"
+            "layout (location = 1) in vec2 inTextureCoordinates;"
+            "\n"
+            "out vec2 texCoord;"
+            "\n"
+            "uniform mat4 transform;"
+            "\n"
+            "void main()"
+            "\n"
+            "{"
+            "\n"
+            "    gl_Position = transform * vec4(inPosition, 1.0);"
+            "\n"
+            "    texCoord = inTextureCoordinates;"
+            "\n"
+            "}"
+            "\n";
 
     std::string const fragmentShaderSourceCode =
-            "#version 430 core" "\n"
-            "uniform vec3 uniformColor;" "\n"
-            "uniform sampler2D uniformTexture;" "\n"
-            "in vec2 texCoord;" "\n"
-            "out vec4 outColor;" "\n"
-            "void main()" "\n"
-            "{" "\n"
-            "    outColor = texture(uniformTexture, " "\n"
-            "                   texCoord) * vec4(uniformColor,1);" "\n"
-            "}" "\n";
+            "#version 430 core"
+            "\n"
+            "uniform vec3 uniformColor;"
+            "\n"
+            "uniform sampler2D uniformTexture;"
+            "\n"
+            "in vec2 texCoord;"
+            "\n"
+            "out vec4 outColor;"
+            "\n"
+            "void main()"
+            "\n"
+            "{"
+            "\n"
+            "    outColor = texture(uniformTexture, "
+            "\n"
+            "                   texCoord) * vec4(uniformColor,1);"
+            "\n"
+            "}"
+            "\n";
 
     compileShader(vertexShaderNumber,
                   vertexShaderSourceCode);
@@ -406,7 +451,6 @@ void setupGLFW() {
                           << "; "
                           << "Description: "
                           << description;
-
             });
     if (!glfwInit()) {
         throw std::exception("glfwInit error");
@@ -429,7 +473,7 @@ void createWindow() {
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(
-            1);          // Enable vertical synchronization
+            1); // Enable vertical synchronization
 }
 
 void initializeOpenGLLoader() {
@@ -507,11 +551,11 @@ void performMainLoop() {
                              glm::vec3(0.0, 1.0, 0.0)) *
                  glm::rotate(glm::mat4(1.0f), angleX,
                              glm::vec3(1.0, 0.0, 0.0)) *
-                             glm::scale(glm::mat4(1.0f), glm::vec3(7.5f)));
+                 glm::scale(glm::mat4(1.0f), glm::vec3(7.5f)));
         //        trans = glm::translate(trans, glm::vec3(0.0f, 0.0f, 0.0f));
-//        glEnable(GL_CULL_FACE);
-//        glCullFace(GL_BACK);
-//        glFrontFace(GL_CCW);
+        //        glEnable(GL_CULL_FACE);
+        //        glCullFace(GL_BACK);
+        //        glFrontFace(GL_CCW);
         glViewport(0, 0, displayWidth, displayHeight);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

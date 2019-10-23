@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
-project(first-paragraph VERSION 0.1)
+project(second-paragraph VERSION 1)
 
 set(THIRDPARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty")
 
-# add thirdparties
 include(thirdparty/thirdparty.cmake)
 
-# subdirectories
 add_subdirectory(src)
