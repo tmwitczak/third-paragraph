@@ -1,12 +1,14 @@
 // //////////////////////////////////////////////////////////// Includes //
-#include "opengl-headers.h"
-#include "vertex.h"
+#include "opengl-headers.hpp"
+#include "shader.hpp"
+#include "vertex.hpp"
 
 #include <array>
 #include <cmath>
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <tuple>
 #include <vector>
@@ -17,67 +19,70 @@ using glm::perspective;
 using glm::radians;
 using glm::rotate;
 using glm::scale;
-using glm::vec3;
 using glm::value_ptr;
+using glm::vec3;
 
 using std::array;
 using std::begin;
+using std::cerr;
 using std::end;
 using std::endl;
 using std::exception;
-using std::cerr;
-using std::vector;
+using std::make_unique;
 using std::string;
 using std::stringstream;
-
+using std::unique_ptr;
+using std::vector;
 
 // /////////////////////////////////////////////////////////// Constants //
 int const WINDOW_WIDTH = 982;
 int const WINDOW_HEIGHT = 982;
-char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 2"
-                           " (Piramida Sierpińskiego)";
+char const *WINDOW_TITLE =
+    "Tomasz Witczak 216920 - Zadanie 2"
+    " (Piramida Sierpińskiego)";
 
 int const RECURSION_DEPTH_LEVEL_MIN = 0;
 int const RECURSION_DEPTH_LEVEL_MAX = 8;
 
 vector<Vertex> const BASE_PYRAMID = {
-        // Front triangle
-        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
-        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
-        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
-
-        // Left triangle
-        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   0.0f, 0.0f},
-        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
-        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
-
-        // Right triangle
-        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
-        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   1.0f, 0.0f},
-        {0.0f,  -1.0f, 1.0f / sqrt(2.0f),  0.5f, 1.0f},
-
-        // Bottom triangle
-        {1.0f,  0.0f, -1.0f / sqrt(2.0f),  0.0f, 0.0f},
-        {-1.0f, 0.0f, -1.0f / sqrt(2.0f),  1.0f, 0.0f},
-        {0.0f,  1.0f, 1.0f / sqrt(2.0f),   0.5f, 1.0f}};
+{0.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
+//     // Front triangle
+//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
+//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
+//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
+//
+//    // Left triangle
+//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 0.0f, 0.0f},
+//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
+//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
+//
+//    // Right triangle
+//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
+//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 1.0f, 0.0f},
+//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
+//
+//    // Bottom triangle
+//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
+//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
+//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f}};
 
 // /////////////////////////////////////////////////////////// Variables //
 // ----------------------------------------------------------- Window -- //
 GLFWwindow *window = nullptr;
 
 // ---------------------------------------------------------- Shaders -- //
-GLuint shaderProgram;
+unique_ptr<Shader> shader;
 
 // ---------------------------------------------------- VAOs and VBOs -- //
 GLuint vertexArrayObject,
-        vertexBufferObject;
+    vertexBufferObject;
 
 // --------------------------------------------------------- Textures -- //
 unsigned int texture;
 
 // -------------------------------------- Pyramid rotation parameters -- //
 float pyramidRotationAngleX = 0.0f,
-        pyramidRotationAngleY = 0.0f;
+      pyramidRotationAngleY = 0.0f;
 
 // ----------------------------------------------------------- Colors -- //
 ImVec4 fractalColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -93,8 +98,8 @@ bool wireframeMode = false;
 
 // ////////////////////////////////////////////////// Sierpinski pyramid //
 vector<Vertex> generateSierpinskiPyramidVertices(
-        vector<Vertex> vertices,
-        int const recursionDepth) {
+    vector<Vertex> vertices,
+    int const recursionDepth) {
     constexpr int NUMBER_OF_VERTICES_IN_PYRAMID = 12,
                   NUMBER_OF_VERTICES_IN_TRIANGLE = 3;
 
@@ -112,58 +117,48 @@ vector<Vertex> generateSierpinskiPyramidVertices(
     vector<Vertex> centerPoints;
     centerPoints.reserve(NUMBER_OF_VERTICES_IN_PYRAMID);
     for (int i = 0; i < NUMBER_OF_VERTICES_IN_PYRAMID; ++i) {
-        Vertex const firstVertex = vertices[
-                (i + 0) % NUMBER_OF_VERTICES_IN_TRIANGLE
-                + (i / NUMBER_OF_VERTICES_IN_TRIANGLE)
-                  * NUMBER_OF_VERTICES_IN_TRIANGLE];
-        Vertex const secondVertex = vertices[
-                (i + 1) % NUMBER_OF_VERTICES_IN_TRIANGLE
-                + (i / NUMBER_OF_VERTICES_IN_TRIANGLE)
-                  * NUMBER_OF_VERTICES_IN_TRIANGLE];
+        Vertex const firstVertex = vertices[(i + 0) % NUMBER_OF_VERTICES_IN_TRIANGLE + (i / NUMBER_OF_VERTICES_IN_TRIANGLE) * NUMBER_OF_VERTICES_IN_TRIANGLE];
+        Vertex const secondVertex = vertices[(i + 1) % NUMBER_OF_VERTICES_IN_TRIANGLE + (i / NUMBER_OF_VERTICES_IN_TRIANGLE) * NUMBER_OF_VERTICES_IN_TRIANGLE];
 
         centerPoints.push_back((firstVertex + secondVertex) / 2.0f);
     }
 
     // ----------- Recursively calculate vertices of smaller pyramids -- //
     array<vector<Vertex>, 4> smallerPyramids;
-    smallerPyramids[0] = generateSierpinskiPyramidVertices({
-            vertices[0],     centerPoints[0], centerPoints[2],
-            centerPoints[3], vertices[4],     centerPoints[4],
-            centerPoints[0], centerPoints[3], centerPoints[2],
-            vertices[0],     centerPoints[3], centerPoints[0]},
-            recursionDepth - 1);
-    smallerPyramids[1] = generateSierpinskiPyramidVertices({
-            vertices[3],     centerPoints[3], centerPoints[5],
-            centerPoints[6], vertices[7],     centerPoints[7],
-            centerPoints[3], centerPoints[6], centerPoints[5],
-            vertices[3],     centerPoints[6], centerPoints[3]},
-            recursionDepth - 1);
-    smallerPyramids[2] = generateSierpinskiPyramidVertices({
-            centerPoints[0], vertices[1],     centerPoints[1],
-            centerPoints[6], centerPoints[0], centerPoints[1],
-            vertices[1],     centerPoints[6], centerPoints[8],
-            vertices[1],     centerPoints[0], centerPoints[6]},
-            recursionDepth - 1);
-    smallerPyramids[3] = generateSierpinskiPyramidVertices({
-            centerPoints[2], centerPoints[1], vertices[2],
-            centerPoints[5], centerPoints[4], vertices[5],
-            centerPoints[8], centerPoints[7], vertices[8],
-            centerPoints[2], centerPoints[5], centerPoints[1]},
-            recursionDepth - 1);
+    smallerPyramids[0] = generateSierpinskiPyramidVertices({vertices[0], centerPoints[0], centerPoints[2],
+                                                            centerPoints[3], vertices[4], centerPoints[4],
+                                                            centerPoints[0], centerPoints[3], centerPoints[2],
+                                                            vertices[0], centerPoints[3], centerPoints[0]},
+                                                           recursionDepth - 1);
+    smallerPyramids[1] = generateSierpinskiPyramidVertices({vertices[3], centerPoints[3], centerPoints[5],
+                                                            centerPoints[6], vertices[7], centerPoints[7],
+                                                            centerPoints[3], centerPoints[6], centerPoints[5],
+                                                            vertices[3], centerPoints[6], centerPoints[3]},
+                                                           recursionDepth - 1);
+    smallerPyramids[2] = generateSierpinskiPyramidVertices({centerPoints[0], vertices[1], centerPoints[1],
+                                                            centerPoints[6], centerPoints[0], centerPoints[1],
+                                                            vertices[1], centerPoints[6], centerPoints[8],
+                                                            vertices[1], centerPoints[0], centerPoints[6]},
+                                                           recursionDepth - 1);
+    smallerPyramids[3] = generateSierpinskiPyramidVertices({centerPoints[2], centerPoints[1], vertices[2],
+                                                            centerPoints[5], centerPoints[4], vertices[5],
+                                                            centerPoints[8], centerPoints[7], vertices[8],
+                                                            centerPoints[2], centerPoints[5], centerPoints[1]},
+                                                           recursionDepth - 1);
 
     // --------------------------------- Sum up the resulting pyramid -- //
     vector<Vertex> result;
     for (auto const &smallerPyramid : smallerPyramids) {
         result.insert(end(result),
-                begin(smallerPyramid),
-                end(smallerPyramid));
+                      begin(smallerPyramid),
+                      end(smallerPyramid));
     }
 
     return result;
 }
 
 void renderTriangle(vector<Vertex> const
-                    &vertices) {
+                        &vertices) {
     int const NUMBER_OF_VERTICES = vertices.size();
     constexpr int NUMBER_OF_COORDINATES = 3;
     constexpr int NUMBER_OF_COORDINATES_UV = 2;
@@ -182,20 +177,15 @@ void renderTriangle(vector<Vertex> const
                                   NUMBER_OF_COORDINATES,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  (NUMBER_OF_COORDINATES
-                                   + NUMBER_OF_COORDINATES_UV)
-                                   * sizeof(float),
+                                  (NUMBER_OF_COORDINATES + NUMBER_OF_COORDINATES_UV) * sizeof(float),
                                   nullptr);
             glEnableVertexAttribArray(0);
             glVertexAttribPointer(1,
                                   NUMBER_OF_COORDINATES_UV,
                                   GL_FLOAT,
                                   GL_FALSE,
-                                  (NUMBER_OF_COORDINATES
-                                   + NUMBER_OF_COORDINATES_UV)
-                                   * sizeof(float),
-                                  (void *) (NUMBER_OF_COORDINATES
-                                            * sizeof(float)));
+                                  (NUMBER_OF_COORDINATES + NUMBER_OF_COORDINATES_UV) * sizeof(float),
+                                  (void *)(NUMBER_OF_COORDINATES * sizeof(float)));
             glEnableVertexAttribArray(1);
         }
         glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -204,13 +194,14 @@ void renderTriangle(vector<Vertex> const
 
     // Draw the triangle
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
 
     glBindVertexArray(vertexArrayObject);
     {
-        glDrawArrays(GL_TRIANGLES, 0, NUMBER_OF_VERTICES);
+        glDrawArrays(GL_POINTS, 0, NUMBER_OF_VERTICES);
     }
     glBindVertexArray(0);
 }
@@ -234,9 +225,9 @@ void generateTextures() {
 
         int imageWidth, imageHeight, imageNumberOfChannels;
         unsigned char *textureData = stbi_load(
-                "res/textures/triangle.jpg",
-                &imageWidth, &imageHeight,
-                &imageNumberOfChannels, 0);
+            "res/textures/triangle.jpg",
+            &imageWidth, &imageHeight,
+            &imageNumberOfChannels, 0);
 
         if (textureData == nullptr) {
             throw exception("Failed to load texture!");
@@ -254,108 +245,6 @@ void generateTextures() {
         stbi_image_free(textureData);
     }
 }
-
-// ///////////////////////////////////////////////////////////// Shaders //
-void checkForShaderCompileErrors(int const shader) {
-    int compiledSuccessfully;
-
-    constexpr int INFO_LOG_LENGTH = 512;
-    char infoLog[INFO_LOG_LENGTH];
-
-    glGetShaderiv(shader, GL_COMPILE_STATUS,
-                  &compiledSuccessfully);
-
-    if (!compiledSuccessfully) {
-        glGetShaderInfoLog(shader, INFO_LOG_LENGTH,
-                           nullptr, infoLog);
-
-        stringstream message;
-        message << "Failed to compile shader!" << endl
-                << infoLog;
-        throw exception(message.str().c_str());
-    }
-}
-
-void compileShader(int const shader,
-                   string const &source) {
-    char const *shaderSourceCode = source.c_str();
-    glShaderSource(shader, 1, &shaderSourceCode, nullptr);
-    glCompileShader(shader);
-
-    checkForShaderCompileErrors(shader);
-}
-
-void checkForShaderLinkingErrors(int const shader) {
-    int linkedSuccessfully;
-
-    constexpr int INFO_LOG_LENGTH = 512;
-    char infoLog[INFO_LOG_LENGTH];
-
-    glGetProgramiv(shader, GL_LINK_STATUS,
-                   &linkedSuccessfully);
-
-    if (!linkedSuccessfully) {
-        glGetProgramInfoLog(shader, INFO_LOG_LENGTH,
-                            nullptr, infoLog);
-
-        stringstream message;
-        message << "Failed to link shader!" << endl
-                << infoLog;
-        throw exception(message.str().c_str());
-    }
-}
-
-void linkShaderProgram(int const vertexShader,
-                       int const fragmentShader) {
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-
-    checkForShaderLinkingErrors(shaderProgram);
-}
-
-void createShaderProgram() {
-    int vertexShaderNumber = glCreateShader(
-            GL_VERTEX_SHADER);
-    int fragmentShaderNumber = glCreateShader(
-            GL_FRAGMENT_SHADER);
-
-    string const vertexShaderSourceCode =
-            "#version 430 core" "\n"
-            "layout (location = 0) in vec3 inPosition;" "\n"
-            "layout (location = 1) in vec2 inTextureCoordinates;" "\n"
-            "out vec2 texCoord;" "\n"
-            "uniform mat4 transform;" "\n"
-            "void main()" "\n"
-            "{" "\n"
-            "    gl_Position = transform * vec4(inPosition, 1.0);" "\n"
-            "    texCoord = inTextureCoordinates;" "\n"
-            "}" "\n";
-
-    string const fragmentShaderSourceCode =
-            "#version 430 core" "\n"
-            "uniform vec3 uniformColor;" "\n"
-            "uniform sampler2D uniformTexture;" "\n"
-            "in vec2 texCoord;" "\n"
-            "out vec4 outColor;" "\n"
-            "void main()" "\n"
-            "{" "\n"
-            "    outColor = texture(uniformTexture, " "\n"
-            "                   texCoord) * vec4(uniformColor, 1);" "\n"
-            "}" "\n";
-
-    compileShader(vertexShaderNumber,
-                  vertexShaderSourceCode);
-    compileShader(fragmentShaderNumber,
-                  fragmentShaderSourceCode);
-    linkShaderProgram(vertexShaderNumber,
-                      fragmentShaderNumber);
-
-    glDeleteShader(fragmentShaderNumber);
-    glDeleteShader(vertexShaderNumber);
-}
-
 // ////////////////////////////////////////////////////// User interface //
 void setupDearImGui() {
     constexpr char const *GLSL_VERSION = "#version 430";
@@ -380,7 +269,7 @@ void prepareUserInterfaceWindow() {
                          RECURSION_DEPTH_LEVEL_MIN,
                          RECURSION_DEPTH_LEVEL_MAX);
         ImGui::ColorEdit3("Kolor fraktala",
-                          (float *) &fractalColor);
+                          (float *)&fractalColor);
         ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX, 0.0f, 360.0f);
         ImGui::SliderAngle("Obrot Y", &pyramidRotationAngleY, 0.0f, 360.0f);
         if (ImGui::Button("Tryb siatki")) {
@@ -396,14 +285,14 @@ void prepareUserInterfaceWindow() {
 // //////////////////////////////////////////////////////// Setup OpenGL //
 void setupGLFW() {
     glfwSetErrorCallback(
-            [](int const errorNumber,
-               char const *description) {
-                cerr << "GLFW;"
-                     << "Error " << errorNumber
-                     << "; "
-                     << "Description: "
-                     << description;
-            });
+        [](int const errorNumber,
+           char const *description) {
+            cerr << "GLFW;"
+                 << "Error " << errorNumber
+                 << "; "
+                 << "Description: "
+                 << description;
+        });
     if (!glfwInit()) {
         throw exception("glfwInit error");
     }
@@ -425,7 +314,7 @@ void createWindow() {
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(
-            1); // Enable vertical synchronization
+        1);  // Enable vertical synchronization
 }
 
 void initializeOpenGLLoader() {
@@ -436,11 +325,11 @@ void initializeOpenGLLoader() {
     failedToInitializeOpenGL = (glewInit() != GLEW_OK);
 #elif defined(IMGUI_IMPL_OPENGL_LOADER_GLAD)
     failedToInitializeOpenGL = !gladLoadGLLoader(
-            (GLADloadproc) glfwGetProcAddress);
+        (GLADloadproc)glfwGetProcAddress);
 #endif
     if (failedToInitializeOpenGL) {
         throw exception(
-                "Failed to initialize OpenGL loader!");
+            "Failed to initialize OpenGL loader!");
     }
 }
 
@@ -455,12 +344,16 @@ void setupOpenGL() {
     initializeOpenGLLoader();
     createVertexBuffersAndArrays();
     generateTextures();
-    createShaderProgram();
+    shader = make_unique<Shader>("res\\shaders\\vertex.glsl",
+                                 "res\\shaders\\geometry.glsl",
+                                 "res\\shaders\\fragment.glsl");
     setupDearImGui();
 }
 
 // //////////////////////////////////////////////////////////// Clean up //
 void cleanUp() {
+    shader = nullptr;
+    
     glDeleteBuffers(1, &vertexBufferObject);
     glDeleteVertexArrays(1, &vertexArrayObject);
 
@@ -488,8 +381,8 @@ void performMainLoop() {
         mat4 const identity = mat4(1.0f);
 
         mat4 const projection = perspective(radians(60.0f),
-                            ((float) displayWidth) / ((float) displayHeight),
-                            0.01f, 100.0f);
+                                            ((float)displayWidth) / ((float)displayHeight),
+                                            0.01f, 100.0f);
 
         mat4 const view = lookAt(vec3(0.0f, 0.0f, 2.5f),
                                  vec3(0.0f, 0.0f, 0.0f),
@@ -509,35 +402,33 @@ void performMainLoop() {
         // --------------------------------------- Set rendering mode -- //
         glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
 
-        // ------------------------------------- Set shader variables -- // 
-        glUseProgram(shaderProgram);
+        // ------------------------------------- Set shader variables -- //
+        shader->use();
 
-        glUniformMatrix4fv(
-                glGetUniformLocation(shaderProgram, "transform"),
-                1, GL_FALSE, value_ptr(transformation));
+        shader->uniformMatrix4fv("transform",
+                                 value_ptr(transformation));
 
-        glUniform3f(
-                glGetUniformLocation(shaderProgram, "uniformColor"),
-                fractalColor.x, fractalColor.y, fractalColor.z);
+        shader->uniform3f("uniformColor",
+                          fractalColor.x, fractalColor.y, fractalColor.z);
 
-        glUniform1i(
-                glGetUniformLocation(shaderProgram, "uniformTexture"), 0);
+        shader->uniform1i("uniformTexture",
+                          0);
 
         // ------------------------------------------- Render pyramid -- //
-        if (currentRecursionDepthLevel !=
-            previousRecursionDepthLevel) {
-            sierpinskiPyramid =
-                    generateSierpinskiPyramidVertices(
-                            BASE_PYRAMID,
-                            currentRecursionDepthLevel);
-            previousRecursionDepthLevel = currentRecursionDepthLevel;
-        }
-        renderTriangle(sierpinskiPyramid);
+//        if (currentRecursionDepthLevel !=
+//            previousRecursionDepthLevel) {
+//            sierpinskiPyramid =
+//                generateSierpinskiPyramidVertices(
+//                    BASE_PYRAMID,
+//                    currentRecursionDepthLevel);
+//            previousRecursionDepthLevel = currentRecursionDepthLevel;
+//        }
+        renderTriangle(BASE_PYRAMID);
 
         // ------------------------------------------------------- UI -- //
         prepareUserInterfaceWindow();
         ImGui_ImplOpenGL3_RenderDrawData(
-                ImGui::GetDrawData());
+            ImGui::GetDrawData());
 
         // -------------------------------------------- Update screen -- //
         glfwMakeContextCurrent(window);
@@ -551,8 +442,7 @@ int main() {
         setupOpenGL();
         performMainLoop();
         cleanUp();
-    }
-    catch (exception const &exception) {
+    } catch (exception const &exception) {
         cerr << exception.what();
         return 1;
     }

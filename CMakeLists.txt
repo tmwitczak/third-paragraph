@@ -6,3 +6,4 @@ set(THIRDPARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty")
 include(thirdparty/thirdparty.cmake)
 
 add_subdirectory(src)
+
