@@ -114,6 +114,8 @@ vector<Vertex> sierpinskiPyramid;
 int currentRecursionDepthLevel = 4,
     previousRecursionDepthLevel = -1;
 
+// --------------------------------------------------- Rendering mode -- //
+bool wireframeMode = false;
 
 // ////////////////////////////////////////////////// Sierpinski pyramid //
 vector<Vertex> generateSierpinskiPyramidVertices(
@@ -407,6 +409,9 @@ void prepareUserInterfaceWindow() {
                           (float *) &fractalColor);
         ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX, 0.0f, 360.0f);
         ImGui::SliderAngle("Obrot Y", &pyramidRotationAngleY, 0.0f, 360.0f);
+        if (ImGui::Button("Tryb siatki")) {
+            wireframeMode = !wireframeMode;
+        }
         ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
         ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
     }
@@ -526,6 +531,9 @@ void performMainLoop() {
         glViewport(0, 0, displayWidth, displayHeight);
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // --------------------------------------- Set rendering mode -- //
+        glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
 
         // ------------------------------------- Set shader variables -- // 
         glUseProgram(shaderProgram);
