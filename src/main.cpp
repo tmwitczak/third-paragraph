@@ -1,5 +1,6 @@
 // //////////////////////////////////////////////////////////// Includes //
 #include "opengl-headers.h"
+#include "vertex.h"
 
 #include <array>
 #include <cmath>
@@ -29,33 +30,6 @@ using std::vector;
 using std::string;
 using std::stringstream;
 
-// ////////////////////////////////////////////////////// Struct: Vertex //
-struct Vertex {
-    // ========================================================= Data == //
-    // -------------------------------------------------- Position -- == //
-    float x, y, z;
-
-    // --------------------------------------------------- Texture -- == //
-    float u, v;
-
-    // ==================================================== Behaviour == //
-    // ------------------------------------------------- Operators -- == //
-    Vertex operator+(Vertex const &vertex) const {
-        return {x + vertex.x,
-                y + vertex.y,
-                z + vertex.z,
-                u + vertex.u,
-                v + vertex.v};
-    }
-
-    Vertex operator/(float const divisor) const {
-        return {x / divisor,
-                y / divisor,
-                z / divisor,
-                u / divisor,
-                v / divisor};
-    }
-};
 
 // /////////////////////////////////////////////////////////// Constants //
 int const WINDOW_WIDTH = 982;
