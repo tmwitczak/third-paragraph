@@ -45,8 +45,8 @@ int const SUBDIVISION_LEVEL_MIN = 1;
 int const SUBDIVISION_LEVEL_MAX = 7;
 
 vector<Vertex> const BASE_PYRAMID = {
-{0.0f, 0.0f, 0.1f, 0.0f, 0.0f},
-{1.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
+{0.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
+//{1.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
 //     // Front triangle
 //    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
 //    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
