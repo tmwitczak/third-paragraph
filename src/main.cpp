@@ -41,11 +41,12 @@ char const *WINDOW_TITLE =
     "Tomasz Witczak 216920 - Zadanie 2"
     " (Piramida Sierpińskiego)";
 
-int const RECURSION_DEPTH_LEVEL_MIN = 0;
-int const RECURSION_DEPTH_LEVEL_MAX = 8;
+int const SUBDIVISION_LEVEL_MIN = 1;
+int const SUBDIVISION_LEVEL_MAX = 7;
 
 vector<Vertex> const BASE_PYRAMID = {
-{0.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
+{0.0f, 0.0f, 0.1f, 0.0f, 0.0f},
+{1.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
 //     // Front triangle
 //    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
 //    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
@@ -90,8 +91,7 @@ ImVec4 fractalColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
 // ----------------------------------------------------- Pyramid data -- //
 vector<Vertex> sierpinskiPyramid;
 
-int currentRecursionDepthLevel = 4,
-    previousRecursionDepthLevel = -1;
+int subdivisionLevel = 7;
 
 // --------------------------------------------------- Rendering mode -- //
 bool wireframeMode = false;
@@ -225,7 +225,7 @@ void generateTextures() {
 
         int imageWidth, imageHeight, imageNumberOfChannels;
         unsigned char *textureData = stbi_load(
-            "res/textures/triangle.jpg",
+            "res/textures/jupiter.jpg",
             &imageWidth, &imageHeight,
             &imageNumberOfChannels, 0);
 
@@ -264,10 +264,10 @@ void prepareUserInterfaceWindow() {
     ImGui::NewFrame();
     ImGui::Begin("Piramida Sierpinskiego");
     {
-        ImGui::SliderInt("Poziom rekurencji",
-                         &currentRecursionDepthLevel,
-                         RECURSION_DEPTH_LEVEL_MIN,
-                         RECURSION_DEPTH_LEVEL_MAX);
+        ImGui::SliderInt("Szczegolowosc kuli",
+                         &subdivisionLevel,
+                         SUBDIVISION_LEVEL_MIN,
+                         SUBDIVISION_LEVEL_MAX);
         ImGui::ColorEdit3("Kolor fraktala",
                           (float *)&fractalColor);
         ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX, 0.0f, 360.0f);
@@ -396,7 +396,7 @@ void performMainLoop() {
 
         // ------------------------------------------- Clear viewport -- //
         glViewport(0, 0, displayWidth, displayHeight);
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // --------------------------------------- Set rendering mode -- //
@@ -408,6 +408,9 @@ void performMainLoop() {
         shader->uniformMatrix4fv("transform",
                                  value_ptr(transformation));
 
+        shader->uniform1i("subdivisionLevelHorizontal", subdivisionLevel + 2);
+        shader->uniform1i("subdivisionLevelVertical", subdivisionLevel + 1);
+
         shader->uniform3f("uniformColor",
                           fractalColor.x, fractalColor.y, fractalColor.z);
 
@@ -415,14 +418,6 @@ void performMainLoop() {
                           0);
 
         // ------------------------------------------- Render pyramid -- //
-//        if (currentRecursionDepthLevel !=
-//            previousRecursionDepthLevel) {
-//            sierpinskiPyramid =
-//                generateSierpinskiPyramidVertices(
-//                    BASE_PYRAMID,
-//                    currentRecursionDepthLevel);
-//            previousRecursionDepthLevel = currentRecursionDepthLevel;
-//        }
         renderTriangle(BASE_PYRAMID);
 
         // ------------------------------------------------------- UI -- //

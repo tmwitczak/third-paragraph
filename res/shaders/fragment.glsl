@@ -1,6 +1,6 @@
 #version 430 core
 // ////////////////////////////////////////////////////////////// Inputs //
-in vec2 texCoord;
+in vec2 texCoordGF;
 // ///////////////////////////////////////////////////////////// Outputs //
 out vec4 outColor;
 // //////////////////////////////////////////////////////////// Uniforms //
@@ -8,5 +8,5 @@ uniform vec3 uniformColor;
 uniform sampler2D uniformTexture;
 // //////////////////////////////////////////////////////////////// Main //
 void main() {
-    outColor = texture(uniformTexture, texCoord) * vec4(uniformColor, 1.0);
+    outColor = texture(uniformTexture, texCoordGF) * vec4(uniformColor, 1.0);
 }
