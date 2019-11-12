@@ -207,7 +207,7 @@ void renderTriangle(vector<Vertex> const
 }
 
 // //////////////////////////////////////////////////////////// Textures //
-void generateTextures() {
+GLuint loadTextureFromFile(string const &filename) {
     // Generate OpenGL resource
     glGenTextures(1, &texture);
 
@@ -225,7 +225,7 @@ void generateTextures() {
 
         int imageWidth, imageHeight, imageNumberOfChannels;
         unsigned char *textureData = stbi_load(
-            "res/textures/jupiter.jpg",
+            filename.c_str(),
             &imageWidth, &imageHeight,
             &imageNumberOfChannels, 0);
 
@@ -235,7 +235,15 @@ void generateTextures() {
 
         // Pass image to OpenGL
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB,
-                     imageWidth, imageHeight, 0, GL_RGB,
+                     imageWidth, imageHeight, 0,
+                     [&]() -> GLenum {
+                         switch (imageNumberOfChannels) {
+                             case 1:  return GL_RED;
+                             case 3:  return GL_RGB;
+                             case 4:  return GL_RGBA;
+                             default: return GL_RGB;
+                         }
+                     }(),
                      GL_UNSIGNED_BYTE, textureData);
 
         // Generate mipmap for loaded texture
@@ -244,6 +252,13 @@ void generateTextures() {
         // After loading into OpenGL - release the raw resource
         stbi_image_free(textureData);
     }
+
+    // Return texture's ID
+    return texture;
+}
+
+void generateTextures() {
+    texture = loadTextureFromFile("res/textures/jupiter.jpg");
 }
 // ////////////////////////////////////////////////////// User interface //
 void setupDearImGui() {

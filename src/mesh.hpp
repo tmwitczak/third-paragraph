@@ -3,13 +3,11 @@
 // //////////////////////////////////////////////////////////// Includes //
 #include "shader.hpp"
 
-#include "glm/glm.hpp"
+#include "opengl-headers.hpp"
 
 #include <string>
 #include <vector>
-// ///////////////////////////////////////////////////////// Class: Mesh //
-class Mesh {
-public:
+
     // ////////////////////////////////////////////////// Struct: Vertex //
     struct Vertex {
         glm::vec3 position;
@@ -17,15 +15,18 @@ public:
     };
     // ///////////////////////////////////////////////// Struct: Texture //
     struct Texture {
-        int id;
-        std::string path;
+        GLuint id;
+        std::string filename;
     };
+// ///////////////////////////////////////////////////////// Class: Mesh //
+class Mesh {
+public:
 
     Mesh(std::vector<Vertex> const &vertices,
          std::vector<unsigned int> const &indices,
          std::vector<Texture> const &textures);
 
-    void render(Shader &shader);
+    void render(Shader &shader) const;
 
 private:
     void setupMesh();

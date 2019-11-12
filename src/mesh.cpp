@@ -15,7 +15,7 @@ Mesh::Mesh(vector<Vertex> const &vertices,
     setupMesh();
 }
 
-void Mesh::render(Shader &shader) {
+void Mesh::render(Shader &shader) const {
     glActiveTexture(GL_TEXTURE0);
 
     //todo
@@ -45,11 +45,8 @@ void Mesh::setupMesh() {
         glEnableVertexAttribArray(0);	
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
 
-        glEnableVertexAttribArray(1);	
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(glm::vec3)));
-
-        glEnableVertexAttribArray(2);	
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)offsetof(Vertex, TexCoords));
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(glm::vec3)));
     }
     glBindVertexArray(0);
 }
