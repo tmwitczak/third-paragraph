@@ -8,6 +8,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 // ?
 unsigned int TextureFromFile(const char *path,
@@ -23,7 +24,7 @@ private:
 public:
     Model(std::string const &path, bool gamma = false);
 
-    void render(Shader &shader);
+    void render(std::shared_ptr<Shader> shader);
     
 private:
     void loadModel(std::string const &path);

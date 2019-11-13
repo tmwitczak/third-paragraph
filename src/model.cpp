@@ -12,22 +12,25 @@
 
 #include <exception>
 #include <vector>
+#include <memory>
 
 using std::exception;
 using std::string;
 using std::vector;
+using std::shared_ptr;
 
 using glm::vec2;
 using glm::vec3;
 
 GLuint loadTextureFromFile(string const &filename);
 
+#include <iostream>
 Model::Model(string const &path, bool gamma)
     : gammaCorrection(gamma) {
     loadModel(path);
 }
-
-void Model::render(Shader &shader) {
+#include <iostream>
+void Model::render(shared_ptr<Shader> shader) {
     for (auto const &mesh : meshes) {
         mesh.render(shader);
     }
@@ -37,7 +40,7 @@ void Model::loadModel(string const &path) {
     Assimp::Importer importer;
 
     aiScene const *scene = importer.ReadFile(path,
-            aiProcess_Triangulate | aiProcess_FlipUVs);
+            aiProcess_Triangulate/* | aiProcess_FlipUVs*/);
 
     if(!scene ||
        scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
@@ -49,12 +52,24 @@ void Model::loadModel(string const &path) {
     processNode(scene->mRootNode, scene);
 }
 
+int x = 0;
 void Model::processNode(aiNode *node, const aiScene *scene) {
-    for(int i = 0; i < node->mNumMeshes; ++i) {
-        meshes.push_back(processMesh(scene->mMeshes[node->mMeshes[i]],
-                                     scene));
+    std::cout << x++ << std::endl;
+    if (!node) {
+        std::cout << ",back" << std::endl;
+        return;
     }
-    for(int i = 0; i < node->mNumChildren; ++i) {
+    for(unsigned int i = 0; i < node->mNumMeshes; ++i) {
+        std::cout << "|";
+        std::cout << scene->mNumMeshes;
+        Mesh m = processMesh(scene->mMeshes[node->mMeshes[i]], scene);
+        if (m.vertices.size() > 0) {
+            m.setupMesh();
+            meshes.push_back(m);
+        }
+    }
+    for(unsigned int i = 0; i < node->mNumChildren; ++i) {
+        std::cout << "..." << i << std::endl;
         processNode(node->mChildren[i], scene);
     }
 }
@@ -85,6 +100,8 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
         else {
             vertex.texCoords = vec2(0.0f, 0.0f);
         }
+
+        vertices.push_back(vertex);
     }
 
     for(int i = 0; i < mesh->mNumFaces; ++i) {
@@ -94,9 +111,9 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
             indices.push_back(face.mIndices[j]);
     }
 
-    aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];    
+    aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
 
-    for(int i = 0; i < material->GetTextureCount(aiTextureType_DIFFUSE); ++i) {
+    for(unsigned int i = 0; i < material->GetTextureCount(aiTextureType_DIFFUSE); ++i) {
         aiString path;
         material->GetTexture(aiTextureType_DIFFUSE, i, &path);
 
@@ -104,7 +121,7 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
             loadTextureFromFile(path.C_Str()), path.C_Str()
         });
     }
-    
+
     return Mesh(vertices, indices, textures);
 }
 

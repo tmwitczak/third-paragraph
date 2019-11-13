@@ -7,6 +7,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
     // ////////////////////////////////////////////////// Struct: Vertex //
     struct Vertex {
@@ -26,9 +27,9 @@ public:
          std::vector<unsigned int> const &indices,
          std::vector<Texture> const &textures);
 
-    void render(Shader &shader) const;
+    void render(std::shared_ptr<Shader> shader) const;
 
-private:
+public:
     void setupMesh();
 
     unsigned int vao, vbo, ebo;

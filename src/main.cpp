@@ -1,7 +1,8 @@
 // //////////////////////////////////////////////////////////// Includes //
 #include "opengl-headers.hpp"
 #include "shader.hpp"
-#include "vertex.hpp"
+//#include "vertex.hpp"
+#include "model.hpp"
 
 #include <array>
 #include <cmath>
@@ -29,186 +30,35 @@ using std::end;
 using std::endl;
 using std::exception;
 using std::make_unique;
+using std::make_shared;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using std::shared_ptr;
 using std::vector;
 
 // /////////////////////////////////////////////////////////// Constants //
 int const WINDOW_WIDTH = 982;
 int const WINDOW_HEIGHT = 982;
-char const *WINDOW_TITLE =
-    "Tomasz Witczak 216920 - Zadanie 2"
-    " (Piramida Sierpińskiego)";
-
-int const SUBDIVISION_LEVEL_MIN = 1;
-int const SUBDIVISION_LEVEL_MAX = 7;
-
-vector<Vertex> const BASE_PYRAMID = {
-{0.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
-//{1.0f, 0.0f, 0.1f, 0.0f, 0.0f}};
-//     // Front triangle
-//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
-//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
-//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
-//
-//    // Left triangle
-//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 0.0f, 0.0f},
-//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
-//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
-//
-//    // Right triangle
-//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
-//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 1.0f, 0.0f},
-//    {0.0f, -1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f},
-//
-//    // Bottom triangle
-//    {1.0f, 0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0f},
-//    {-1.0f, 0.0f, -1.0f / sqrt(2.0f), 1.0f, 0.0f},
-//    {0.0f, 1.0f, 1.0f / sqrt(2.0f), 0.5f, 1.0f}};
+char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 3";
 
 // /////////////////////////////////////////////////////////// Variables //
 // ----------------------------------------------------------- Window -- //
 GLFWwindow *window = nullptr;
 
 // ---------------------------------------------------------- Shaders -- //
-unique_ptr<Shader> shader;
-
-// ---------------------------------------------------- VAOs and VBOs -- //
-GLuint vertexArrayObject,
-    vertexBufferObject;
-
-// --------------------------------------------------------- Textures -- //
-unsigned int texture;
-
-// -------------------------------------- Pyramid rotation parameters -- //
-float pyramidRotationAngleX = 0.0f,
-      pyramidRotationAngleY = 0.0f;
-
-// ----------------------------------------------------------- Colors -- //
-ImVec4 fractalColor = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-
-// ----------------------------------------------------- Pyramid data -- //
-vector<Vertex> sierpinskiPyramid;
-
-int subdivisionLevel = 7;
+shared_ptr<Shader> modelShader,
+                   sphereShader;
 
 // --------------------------------------------------- Rendering mode -- //
 bool wireframeMode = false;
 
-// ////////////////////////////////////////////////// Sierpinski pyramid //
-vector<Vertex> generateSierpinskiPyramidVertices(
-    vector<Vertex> vertices,
-    int const recursionDepth) {
-    constexpr int NUMBER_OF_VERTICES_IN_PYRAMID = 12,
-                  NUMBER_OF_VERTICES_IN_TRIANGLE = 3;
-
-    // ----------------------------------------- Return basic pyramid -- //
-    if (recursionDepth == 0) {
-        // Set base UV coordinates for each pyramid
-        for (int i = 0; i < NUMBER_OF_VERTICES_IN_PYRAMID; ++i) {
-            vertices[i].u = BASE_PYRAMID[i].u;
-            vertices[i].v = BASE_PYRAMID[i].v;
-        }
-        return vertices;
-    }
-
-    // -------------------------------------- Calculate center points -- //
-    vector<Vertex> centerPoints;
-    centerPoints.reserve(NUMBER_OF_VERTICES_IN_PYRAMID);
-    for (int i = 0; i < NUMBER_OF_VERTICES_IN_PYRAMID; ++i) {
-        Vertex const firstVertex = vertices[(i + 0) % NUMBER_OF_VERTICES_IN_TRIANGLE + (i / NUMBER_OF_VERTICES_IN_TRIANGLE) * NUMBER_OF_VERTICES_IN_TRIANGLE];
-        Vertex const secondVertex = vertices[(i + 1) % NUMBER_OF_VERTICES_IN_TRIANGLE + (i / NUMBER_OF_VERTICES_IN_TRIANGLE) * NUMBER_OF_VERTICES_IN_TRIANGLE];
-
-        centerPoints.push_back((firstVertex + secondVertex) / 2.0f);
-    }
-
-    // ----------- Recursively calculate vertices of smaller pyramids -- //
-    array<vector<Vertex>, 4> smallerPyramids;
-    smallerPyramids[0] = generateSierpinskiPyramidVertices({vertices[0], centerPoints[0], centerPoints[2],
-                                                            centerPoints[3], vertices[4], centerPoints[4],
-                                                            centerPoints[0], centerPoints[3], centerPoints[2],
-                                                            vertices[0], centerPoints[3], centerPoints[0]},
-                                                           recursionDepth - 1);
-    smallerPyramids[1] = generateSierpinskiPyramidVertices({vertices[3], centerPoints[3], centerPoints[5],
-                                                            centerPoints[6], vertices[7], centerPoints[7],
-                                                            centerPoints[3], centerPoints[6], centerPoints[5],
-                                                            vertices[3], centerPoints[6], centerPoints[3]},
-                                                           recursionDepth - 1);
-    smallerPyramids[2] = generateSierpinskiPyramidVertices({centerPoints[0], vertices[1], centerPoints[1],
-                                                            centerPoints[6], centerPoints[0], centerPoints[1],
-                                                            vertices[1], centerPoints[6], centerPoints[8],
-                                                            vertices[1], centerPoints[0], centerPoints[6]},
-                                                           recursionDepth - 1);
-    smallerPyramids[3] = generateSierpinskiPyramidVertices({centerPoints[2], centerPoints[1], vertices[2],
-                                                            centerPoints[5], centerPoints[4], vertices[5],
-                                                            centerPoints[8], centerPoints[7], vertices[8],
-                                                            centerPoints[2], centerPoints[5], centerPoints[1]},
-                                                           recursionDepth - 1);
-
-    // --------------------------------- Sum up the resulting pyramid -- //
-    vector<Vertex> result;
-    for (auto const &smallerPyramid : smallerPyramids) {
-        result.insert(end(result),
-                      begin(smallerPyramid),
-                      end(smallerPyramid));
-    }
-
-    return result;
-}
-
-void renderTriangle(vector<Vertex> const
-                        &vertices) {
-    int const NUMBER_OF_VERTICES = vertices.size();
-    constexpr int NUMBER_OF_COORDINATES = 3;
-    constexpr int NUMBER_OF_COORDINATES_UV = 2;
-
-    // Fill VBO and VAO
-    glBindVertexArray(vertexArrayObject);
-    {
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
-        {
-            glBufferData(GL_ARRAY_BUFFER,
-                         NUMBER_OF_VERTICES * sizeof(Vertex),
-                         vertices.data(),
-                         GL_STATIC_DRAW);
-
-            glVertexAttribPointer(0,
-                                  NUMBER_OF_COORDINATES,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  (NUMBER_OF_COORDINATES + NUMBER_OF_COORDINATES_UV) * sizeof(float),
-                                  nullptr);
-            glEnableVertexAttribArray(0);
-            glVertexAttribPointer(1,
-                                  NUMBER_OF_COORDINATES_UV,
-                                  GL_FLOAT,
-                                  GL_FALSE,
-                                  (NUMBER_OF_COORDINATES + NUMBER_OF_COORDINATES_UV) * sizeof(float),
-                                  (void *)(NUMBER_OF_COORDINATES * sizeof(float)));
-            glEnableVertexAttribArray(1);
-        }
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    glBindVertexArray(0);
-
-    // Draw the triangle
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_PROGRAM_POINT_SIZE);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-
-    glBindVertexArray(vertexArrayObject);
-    {
-        glDrawArrays(GL_POINTS, 0, NUMBER_OF_VERTICES);
-    }
-    glBindVertexArray(0);
-}
+shared_ptr<Model> model;
 
 // //////////////////////////////////////////////////////////// Textures //
 GLuint loadTextureFromFile(string const &filename) {
     // Generate OpenGL resource
+    GLuint texture;
     glGenTextures(1, &texture);
 
     // Setup the texture
@@ -256,10 +106,70 @@ GLuint loadTextureFromFile(string const &filename) {
     // Return texture's ID
     return texture;
 }
+class Sphere {
+public:
+    static constexpr int SUBDIVISION_LEVEL_MIN = 1;
+    static constexpr int SUBDIVISION_LEVEL_MAX = 7;
 
-void generateTextures() {
-    texture = loadTextureFromFile("res/textures/jupiter.jpg");
-}
+private:
+    GLuint vao, vbo;
+    GLuint texture;
+
+    vec3 const point {0.0f, 0.0f, 0.0f};
+
+public:
+    int subdivisionLevel = SUBDIVISION_LEVEL_MAX;
+
+    Sphere() {
+        glGenVertexArrays(1, &vao);
+        glGenBuffers(1, &vbo);
+
+        glBindVertexArray(vao);
+            glBindBuffer(GL_ARRAY_BUFFER, vbo);
+                glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex), &point,
+                        GL_STATIC_DRAW);
+
+                glEnableVertexAttribArray(0);
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE,
+                        sizeof(vec3), nullptr);
+
+            glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+
+        texture = loadTextureFromFile("res/textures/jupiter.jpg");
+    }
+
+
+    ~Sphere() {
+        glDeleteBuffers(1, &vbo);
+        glDeleteVertexArrays(1, &vao);
+    }
+
+    void render(shared_ptr<Shader> shader) {
+        shader->use();
+
+        sphereShader->uniform1i("subdivisionLevelHorizontal",
+                subdivisionLevel + 2);
+        sphereShader->uniform1i("subdivisionLevelVertical",
+                subdivisionLevel + 1);
+
+        sphereShader->uniform1i("texture0", 0);
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_PROGRAM_POINT_SIZE);
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+
+        glBindVertexArray(vao);
+            glDrawArrays(GL_POINTS, 0, 1);
+        glBindVertexArray(0);
+    }
+};
+
+unique_ptr<Sphere> sphere;
+
+
 // ////////////////////////////////////////////////////// User interface //
 void setupDearImGui() {
     constexpr char const *GLSL_VERSION = "#version 430";
@@ -280,18 +190,14 @@ void prepareUserInterfaceWindow() {
     ImGui::Begin("Piramida Sierpinskiego");
     {
         ImGui::SliderInt("Szczegolowosc kuli",
-                         &subdivisionLevel,
-                         SUBDIVISION_LEVEL_MIN,
-                         SUBDIVISION_LEVEL_MAX);
-        ImGui::ColorEdit3("Kolor fraktala",
-                          (float *)&fractalColor);
-        ImGui::SliderAngle("Obrot X", &pyramidRotationAngleX, 0.0f, 360.0f);
-        ImGui::SliderAngle("Obrot Y", &pyramidRotationAngleY, 0.0f, 360.0f);
+                         &sphere->subdivisionLevel,
+                         Sphere::SUBDIVISION_LEVEL_MIN,
+                         Sphere::SUBDIVISION_LEVEL_MAX);
         if (ImGui::Button("Tryb siatki")) {
             wireframeMode = !wireframeMode;
         }
-        ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
-        ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
+        // ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
+        // ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
     }
     ImGui::End();
     ImGui::Render();
@@ -328,8 +234,7 @@ void createWindow() {
         throw exception("glfwCreateWindow error");
     }
     glfwMakeContextCurrent(window);
-    glfwSwapInterval(
-        1);  // Enable vertical synchronization
+    glfwSwapInterval(1);  // Enable vertical synchronization
 }
 
 void initializeOpenGLLoader() {
@@ -348,33 +253,39 @@ void initializeOpenGLLoader() {
     }
 }
 
-void createVertexBuffersAndArrays() {
-    glGenVertexArrays(1, &vertexArrayObject);
-    glGenBuffers(1, &vertexBufferObject);
-}
 
 void setupOpenGL() {
     setupGLFW();
     createWindow();
     initializeOpenGLLoader();
-    createVertexBuffersAndArrays();
-    generateTextures();
-    shader = make_unique<Shader>("res\\shaders\\vertex.glsl",
-                                 "res\\shaders\\geometry.glsl",
-                                 "res\\shaders\\fragment.glsl");
+
+    model = make_shared<Model>("res/models/orangelow.obj");
+
+    modelShader = make_shared<Shader>("res/shaders/model/vertex.glsl",
+                                      "res/shaders/model/geometry.glsl",
+                                      "res/shaders/model/fragment.glsl");
+
+    sphereShader = make_shared<Shader>("res/shaders/sphere/vertex.glsl",
+                                       "res/shaders/sphere/geometry.glsl",
+                                       "res/shaders/sphere/fragment.glsl");
+
+    sphere = make_unique<Sphere>();
+
     setupDearImGui();
 }
 
 // //////////////////////////////////////////////////////////// Clean up //
 void cleanUp() {
-    shader = nullptr;
-    
-    glDeleteBuffers(1, &vertexBufferObject);
-    glDeleteVertexArrays(1, &vertexArrayObject);
-
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+
+    sphere = nullptr;
+
+    sphereShader = nullptr;
+    modelShader = nullptr;
+
+    model = nullptr;
 
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -404,12 +315,18 @@ void performMainLoop() {
                                  vec3(0.0f, 1.0f, 0.0f));
 
         mat4 model = identity;
-        model = rotate(model, pyramidRotationAngleX, vec3(1.0, 0.0, 0.0));
-        model = rotate(model, pyramidRotationAngleY, vec3(0.0, 1.0, 0.0));
+        model = glm::scale(model, vec3(0.025f));
+        static float angle = 0.0f;
+        angle += 0.01f;
+         model = rotate(model, angle, vec3(0.0, 1.0, 0.0));
+        // model = rotate(model, pyramidRotationAngleY, vec3(0.0, 1.0, 0.0));
 
         mat4 const transformation = projection * view * model;
 
         // ------------------------------------------- Clear viewport -- //
+//        glFrontFace(GL_CW);
+//        glCullFace(GL_BACK);
+        glEnable(GL_DEPTH_TEST);
         glViewport(0, 0, displayWidth, displayHeight);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -418,22 +335,19 @@ void performMainLoop() {
         glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
 
         // ------------------------------------- Set shader variables -- //
-        shader->use();
+        sphereShader->use();
 
-        shader->uniformMatrix4fv("transform",
-                                 value_ptr(transformation));
+        sphereShader->uniformMatrix4fv("transform",
+                value_ptr(transformation));
 
-        shader->uniform1i("subdivisionLevelHorizontal", subdivisionLevel + 2);
-        shader->uniform1i("subdivisionLevelVertical", subdivisionLevel + 1);
+        modelShader->use();
+        modelShader->uniformMatrix4fv("transform",
+                                       value_ptr(transformation));
 
-        shader->uniform3f("uniformColor",
-                          fractalColor.x, fractalColor.y, fractalColor.z);
+        // -------------------------------------------- Render sphere -- //
+        //sphere->render(sphereShader);
 
-        shader->uniform1i("uniformTexture",
-                          0);
-
-        // ------------------------------------------- Render pyramid -- //
-        renderTriangle(BASE_PYRAMID);
+        ::model->render(modelShader);
 
         // ------------------------------------------------------- UI -- //
         prepareUserInterfaceWindow();

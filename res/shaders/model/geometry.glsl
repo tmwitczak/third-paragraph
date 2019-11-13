@@ -1,17 +1,24 @@
 // //////////////////////////////////////////////////////// GLSL version //
 #version 430 core
 
+// ////////////////////////////////////////////////////////// Primitives //
+layout (triangles) in;
+layout (triangle_strip, max_vertices = 3) out;
+
 // ////////////////////////////////////////////////////////////// Inputs //
-layout (location = 0) in vec3 posV;
-layout (location = 1) in vec2 texCoordV;
+in vec2 texCoordG[3];
 
 // ///////////////////////////////////////////////////////////// Outputs //
-out vec2 texCoordG;
+out vec2 texCoordF;
 
 // //////////////////////////////////////////////////////////////// Main //
 void main() {
-    gl_Position = vec4(posV, 1.0);
-    texCoordG = texCoordV;
+    for (int i = 0; i < gl_in.length(); ++i) {
+        gl_Position = gl_in[i].gl_Position;
+        texCoordF = texCoordG[i];
+        EmitVertex();
+    }
+    EndPrimitive();
 }
 
 // ///////////////////////////////////////////////////////////////////// //

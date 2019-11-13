@@ -4,7 +4,9 @@
 #include "opengl-headers.hpp"
 
 using std::vector;
+using std::shared_ptr;
 
+#include <iostream>
 // ///////////////////////////////////////////////////////// Class: Mesh //
 Mesh::Mesh(vector<Vertex> const &vertices,
            vector<unsigned int> const &indices,
@@ -12,18 +14,18 @@ Mesh::Mesh(vector<Vertex> const &vertices,
         : vertices(vertices),
           indices(indices),
           textures(textures) {
-    setupMesh();
 }
-
-void Mesh::render(Shader &shader) const {
+void Mesh::render(shared_ptr<Shader> shader) const {
     glActiveTexture(GL_TEXTURE0);
 
     //todo
-    shader.uniform1i("texture0", 0);
+    shader->use();
+    shader->uniform1i("texture0", 0);
     glBindTexture(GL_TEXTURE_2D, textures[0].id);
     
     glBindVertexArray(vao); {
-        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+        std::cout << indices.size();
+        glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, nullptr);
     }
     glBindVertexArray(0);
 
@@ -37,7 +39,8 @@ void Mesh::setupMesh() {
 
     glBindVertexArray(vao); {
         glBindBuffer(GL_ARRAY_BUFFER, vbo);
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);  
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex), &vertices[0], GL_STATIC_DRAW);
+        std::cout << "siema";
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
