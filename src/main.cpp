@@ -1,9 +1,9 @@
 // //////////////////////////////////////////////////////////// Includes //
+#include "model.hpp"
 #include "opengl-headers.hpp"
 #include "shader.hpp"
-//#include "vertex.hpp"
-#include "model.hpp"
 
+#include <chrono>
 #include <array>
 #include <cmath>
 #include <exception>
@@ -13,6 +13,9 @@
 #include <sstream>
 #include <tuple>
 #include <vector>
+
+using sysclock = std::chrono::system_clock;
+using sec = std::chrono::duration<float>;
 
 // ////////////////////////////////////////////////////////////// Usings //
 using glm::mat4;
@@ -37,8 +40,35 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::vector;
 
+
+struct GraphNode {
+    mat4 transform;
+    shared_ptr<Renderable> model;
+    GLuint overrideTexture;
+    vector<shared_ptr<GraphNode>> children;
+
+    GraphNode() : overrideTexture(0), model(nullptr) {}
+
+    void render(mat4 const &world = mat4(1.0f)) {
+        mat4 renderTransform = world * transform;
+
+        if (model) {
+            model->shader->use();
+            model->shader->uniformMatrix4fv("transform", value_ptr(renderTransform));
+
+            model->render(model->shader, overrideTexture);
+        }
+
+        for (auto const &child : children) {
+            child->render(renderTransform);
+        }
+    }
+};
+
+GraphNode scene;
+
 // /////////////////////////////////////////////////////////// Constants //
-int const WINDOW_WIDTH = 982;
+int const WINDOW_WIDTH = 1589;
 int const WINDOW_HEIGHT = 982;
 char const *WINDOW_TITLE = "Tomasz Witczak 216920 - Zadanie 3";
 
@@ -50,10 +80,15 @@ GLFWwindow *window = nullptr;
 shared_ptr<Shader> modelShader,
                    sphereShader;
 
+GLuint plywoodTexture = 0,
+       metalTexture = 0;
+
+vec3 cameraPos(0.6f, 1.7f, 2.5f);
+
 // --------------------------------------------------- Rendering mode -- //
 bool wireframeMode = false;
 
-shared_ptr<Model> model;
+shared_ptr<Renderable> sphere, amplifier, guitar, orbit;
 
 // //////////////////////////////////////////////////////////// Textures //
 GLuint loadTextureFromFile(string const &filename) {
@@ -106,7 +141,7 @@ GLuint loadTextureFromFile(string const &filename) {
     // Return texture's ID
     return texture;
 }
-class Sphere {
+class Sphere : public Renderable {
 public:
     static constexpr int SUBDIVISION_LEVEL_MIN = 1;
     static constexpr int SUBDIVISION_LEVEL_MAX = 7;
@@ -118,7 +153,7 @@ private:
     vec3 const point {0.0f, 0.0f, 0.0f};
 
 public:
-    int subdivisionLevel = SUBDIVISION_LEVEL_MAX;
+    static int subdivisionLevel;
 
     Sphere() {
         glGenVertexArrays(1, &vao);
@@ -145,7 +180,8 @@ public:
         glDeleteVertexArrays(1, &vao);
     }
 
-    void render(shared_ptr<Shader> shader) {
+    void render(shared_ptr<Shader> shader,
+                GLuint const overrideTexture) const {
         shader->use();
 
         sphereShader->uniform1i("subdivisionLevelHorizontal",
@@ -159,15 +195,15 @@ public:
         glEnable(GL_PROGRAM_POINT_SIZE);
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
+        glBindTexture(GL_TEXTURE_2D, overrideTexture != 0 ? overrideTexture : texture);
 
         glBindVertexArray(vao);
             glDrawArrays(GL_POINTS, 0, 1);
         glBindVertexArray(0);
     }
 };
+int Sphere::subdivisionLevel = Sphere::SUBDIVISION_LEVEL_MAX;
 
-unique_ptr<Sphere> sphere;
 
 
 // ////////////////////////////////////////////////////// User interface //
@@ -187,17 +223,21 @@ void prepareUserInterfaceWindow() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
-    ImGui::Begin("Piramida Sierpinskiego");
+    ImGui::Begin("Zadanie 3");
     {
         ImGui::SliderInt("Szczegolowosc kuli",
-                         &sphere->subdivisionLevel,
+                         &Sphere::subdivisionLevel,
                          Sphere::SUBDIVISION_LEVEL_MIN,
                          Sphere::SUBDIVISION_LEVEL_MAX);
         if (ImGui::Button("Tryb siatki")) {
             wireframeMode = !wireframeMode;
         }
-        // ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
-        // ImGui::SetWindowSize(ImVec2(375.0f, 200.0f));
+        ImGui::SliderFloat("Kamera (x)", &cameraPos.x, 0.0f, 4.0f);
+        ImGui::SliderFloat("Kamera (y)", &cameraPos.y, 0.0f, 4.0f);
+        ImGui::SliderFloat("Kamera (z)", &cameraPos.z, 0.5f, 4.0f);
+
+        ImGui::SetWindowPos(ImVec2(0.0f, 0.0f));
+        ImGui::SetWindowSize(ImVec2(400.0f, 150.0f));
     }
     ImGui::End();
     ImGui::Render();
@@ -253,13 +293,127 @@ void initializeOpenGLLoader() {
     }
 }
 
+void setupSceneGraph(float const deltaTime, float const displayWidth, float const displayHeight) {
+    static mat4 const identity = mat4(1.0f);
+    static float angle = 0.0f;
+    angle += glm::radians(45.0f) * deltaTime;
+
+    shared_ptr<GraphNode> gibson = make_shared<GraphNode>();
+    gibson->transform =
+            glm::rotate(identity, angle, vec3(0.0f, 1.0f, 0.0f)) *
+            glm::translate(identity, vec3(-1.0f, 0.0f, 0.0f)) *
+            glm::rotate(identity, -angle, vec3(0.5f, 0.25f, 0.0f)) *
+            glm::scale(identity, vec3(0.1f));
+    gibson->model = guitar;
+    gibson->overrideTexture = plywoodTexture;
+
+    shared_ptr<GraphNode> ball = make_shared<GraphNode>();
+    ball->transform =
+            glm::rotate(identity, angle, vec3(0.0f, 1.0f, 0.0f)) *
+            glm::translate(identity, vec3(1.0f, 0.0f, 0.0f)) *
+            glm::rotate(identity, 2.0f * angle, vec3(0.0f, 0.0f, 1.0f)) *
+            glm::scale(identity, vec3(0.1f));
+    ball->model = sphere;
+    ball->overrideTexture = plywoodTexture;
+
+    shared_ptr<GraphNode> secondOrbit = make_shared<GraphNode>();
+    secondOrbit->transform =
+            glm::rotate(identity, glm::radians(45.0f), vec3(1.0f, 0.0f, 0.0f)) *
+            glm::scale(identity, vec3(0.5f));
+    secondOrbit->model = orbit;
+    secondOrbit->overrideTexture = plywoodTexture;
+    secondOrbit->children.clear();
+    secondOrbit->children.push_back(ball);
+    secondOrbit->children.push_back(gibson);
+
+    shared_ptr<GraphNode> amp = make_shared<GraphNode>();
+    amp->transform =
+            glm::rotate(identity, 1.5f * angle, vec3(1.0f, 0.0f, 1.0f)) *
+            glm::scale(identity, vec3(0.004f));
+    amp->model = amplifier;
+    amp->overrideTexture = metalTexture;
+
+    shared_ptr<GraphNode> otherSystem = make_shared<GraphNode>();
+    otherSystem->transform =
+            glm::rotate(identity, angle, vec3(0.0f, 1.0f, 0.0f)) *
+            glm::translate(identity, vec3(-1.0f, 0.0f, 0.0f));
+    otherSystem->children.clear();
+    otherSystem->children.push_back(secondOrbit);
+    otherSystem->children.push_back(amp);
+
+    shared_ptr<GraphNode> jupiter = make_shared<GraphNode>();
+    jupiter->transform =
+            glm::rotate(identity, angle, vec3(0.0f, 1.0f, 0.0f)) *
+            glm::translate(identity, vec3(1.0f, 0.0f, 0.0f)) *
+            glm::rotate(identity, -angle, vec3(0.0f, 1.0f, 1.0f)) *
+            glm::scale(identity, vec3(0.3f));
+    jupiter->model = sphere;
+    jupiter->overrideTexture = metalTexture;
+
+    shared_ptr<GraphNode> firstOrbit = make_shared<GraphNode>();
+    firstOrbit->transform =
+            glm::rotate(identity, glm::radians(90.0f), vec3(1.0f, 0.0f, 0.0f)) *
+            glm::scale(identity, vec3(10.0f));
+    firstOrbit->model = orbit;
+    firstOrbit->overrideTexture = metalTexture;
+    firstOrbit->children.clear();
+    firstOrbit->children.push_back(jupiter);
+    firstOrbit->children.push_back(otherSystem);
+
+    shared_ptr<GraphNode> lonelyBlue = make_shared<GraphNode>();
+    lonelyBlue->transform =
+            glm::translate(identity, vec3(1.25f, 0.5f, -0.5f)) *
+            glm::scale(identity, vec3(0.0125f));
+    lonelyBlue->model = amplifier;
+
+    shared_ptr<GraphNode> ball2 = make_shared<GraphNode>();
+    ball2->transform =
+            glm::translate(identity, vec3(0.75f, 0.0f, 0.75f)) *
+            glm::rotate(identity, glm::radians(90.0f), vec3(1.0f, 0.0f, 0.0f)) *
+            glm::scale(identity, vec3(0.6f));
+    ball2->model = sphere;
+
+    shared_ptr<GraphNode> notLonelyBlue = make_shared<GraphNode>();
+    notLonelyBlue->transform =
+            glm::translate(identity, vec3(-1.0f, 0.0f, 0.0f)) *
+            glm::rotate(identity, glm::radians(90.0f), vec3(1.0f, 0.0f, 0.0f)) *
+            glm::scale(identity, vec3(0.1f));
+    notLonelyBlue->model = guitar;
+    notLonelyBlue->children.clear();
+    notLonelyBlue->children.push_back(firstOrbit);
+
+    // Scene
+    mat4 const projection = perspective(radians(60.0f),
+                                        ((float)displayWidth) / ((float)displayHeight),
+                                        0.01f, 100.0f);
+
+    mat4 const view = lookAt(cameraPos,//vec3(-0.5f, 2.0f, 2.0f),
+                             vec3(0.0f, 0.0f, 0.0f),
+                             vec3(0.0f, 1.0f, 0.0f));
+
+    scene.transform = projection * view;
+    scene.children.clear();
+    scene.children.push_back(ball2);
+    scene.children.push_back(lonelyBlue);
+    scene.children.push_back(notLonelyBlue);
+
+    // mat4 transform;
+    // shared_ptr<Renderable> model;
+    // GLuint overrideTexture;
+    // vector<shared_ptr<GraphNode>> children;
+}
 
 void setupOpenGL() {
     setupGLFW();
     createWindow();
     initializeOpenGLLoader();
 
-    model = make_shared<Model>("res/models/orangelow.obj");
+    plywoodTexture = loadTextureFromFile("res/textures/plywood.jpg");
+    metalTexture = loadTextureFromFile("res/textures/metal.jpg");
+
+    amplifier = make_shared<Model>("res/models/orange-th30.obj");
+    guitar = make_shared<Model>("res/models/gibson-es335.obj");
+    orbit = make_shared<Model>("res/models/orbit.obj");
 
     modelShader = make_shared<Shader>("res/shaders/model/vertex.glsl",
                                       "res/shaders/model/geometry.glsl",
@@ -269,7 +423,12 @@ void setupOpenGL() {
                                        "res/shaders/sphere/geometry.glsl",
                                        "res/shaders/sphere/fragment.glsl");
 
-    sphere = make_unique<Sphere>();
+    sphere = make_shared<Sphere>();
+
+    amplifier->shader = modelShader;
+    guitar->shader = modelShader;
+    orbit->shader = modelShader;
+    sphere->shader = sphereShader;
 
     setupDearImGui();
 }
@@ -285,7 +444,9 @@ void cleanUp() {
     sphereShader = nullptr;
     modelShader = nullptr;
 
-    model = nullptr;
+    orbit = nullptr;
+    guitar = nullptr;
+    amplifier = nullptr;
 
     glfwDestroyWindow(window);
     glfwTerminate();
@@ -293,7 +454,13 @@ void cleanUp() {
 
 // /////////////////////////////////////////////////////////// Main loop //
 void performMainLoop() {
+    auto previousStartTime = sysclock::now();
+
     while (!glfwWindowShouldClose(window)) {
+        auto const startTime = sysclock::now();
+        sec const deltaTime = startTime - previousStartTime;
+        previousStartTime = startTime;
+
         // --------------------------------------------------- Events -- //
         glfwPollEvents();
 
@@ -303,51 +470,18 @@ void performMainLoop() {
         glfwGetFramebufferSize(window, &displayWidth,
                                &displayHeight);
 
-        // -------------------------------- Calculate transformations -- //
-        mat4 const identity = mat4(1.0f);
-
-        mat4 const projection = perspective(radians(60.0f),
-                                            ((float)displayWidth) / ((float)displayHeight),
-                                            0.01f, 100.0f);
-
-        mat4 const view = lookAt(vec3(0.0f, 0.0f, 2.5f),
-                                 vec3(0.0f, 0.0f, 0.0f),
-                                 vec3(0.0f, 1.0f, 0.0f));
-
-        mat4 model = identity;
-        model = glm::scale(model, vec3(0.025f));
-        static float angle = 0.0f;
-        angle += 0.01f;
-         model = rotate(model, angle, vec3(0.0, 1.0, 0.0));
-        // model = rotate(model, pyramidRotationAngleY, vec3(0.0, 1.0, 0.0));
-
-        mat4 const transformation = projection * view * model;
-
         // ------------------------------------------- Clear viewport -- //
-//        glFrontFace(GL_CW);
-//        glCullFace(GL_BACK);
-        glEnable(GL_DEPTH_TEST);
         glViewport(0, 0, displayWidth, displayHeight);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // --------------------------------------- Set rendering mode -- //
+        glEnable(GL_DEPTH_TEST);
         glPolygonMode(GL_FRONT_AND_BACK, wireframeMode ? GL_LINE : GL_FILL);
 
-        // ------------------------------------- Set shader variables -- //
-        sphereShader->use();
-
-        sphereShader->uniformMatrix4fv("transform",
-                value_ptr(transformation));
-
-        modelShader->use();
-        modelShader->uniformMatrix4fv("transform",
-                                       value_ptr(transformation));
-
-        // -------------------------------------------- Render sphere -- //
-        //sphere->render(sphereShader);
-
-        ::model->render(modelShader);
+        // --------------------------------------------- Render scene -- //
+        setupSceneGraph(deltaTime.count(), displayWidth, displayHeight);
+        scene.render();
 
         // ------------------------------------------------------- UI -- //
         prepareUserInterfaceWindow();
@@ -359,6 +493,7 @@ void performMainLoop() {
         glfwSwapBuffers(window);
     }
 }
+
 
 // //////////////////////////////////////////////////////////////// Main //
 int main() {

@@ -27,7 +27,10 @@ public:
          std::vector<unsigned int> const &indices,
          std::vector<Texture> const &textures);
 
-    void render(std::shared_ptr<Shader> shader) const;
+    ~Mesh();
+
+    void render(std::shared_ptr<Shader> shader,
+                GLuint const overrideTexture = 0) const;
 
 public:
     void setupMesh();

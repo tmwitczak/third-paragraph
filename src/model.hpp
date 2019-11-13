@@ -10,13 +10,15 @@
 #include <vector>
 #include <memory>
 
+#include "renderable.hpp"
+
 // ?
 unsigned int TextureFromFile(const char *path,
 const std::string &directory, bool gamma = false);
 
 
 // //////////////////////////////////////////////////////// Class: Model //
-class Model {
+class Model : public Renderable {
 private:
     std::vector<Mesh> meshes;
     bool gammaCorrection;
@@ -24,7 +26,8 @@ private:
 public:
     Model(std::string const &path, bool gamma = false);
 
-    void render(std::shared_ptr<Shader> shader);
+    void render(std::shared_ptr<Shader> shader,
+                GLuint const overrideTexture = 0) const;
     
 private:
     void loadModel(std::string const &path);

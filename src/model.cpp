@@ -24,15 +24,15 @@ using glm::vec3;
 
 GLuint loadTextureFromFile(string const &filename);
 
-#include <iostream>
 Model::Model(string const &path, bool gamma)
     : gammaCorrection(gamma) {
     loadModel(path);
 }
-#include <iostream>
-void Model::render(shared_ptr<Shader> shader) {
+
+void Model::render(shared_ptr<Shader> shader0,
+                   GLuint const overrideTexture) const {
     for (auto const &mesh : meshes) {
-        mesh.render(shader);
+        mesh.render(shader0, overrideTexture);
     }
 }
     
@@ -54,14 +54,10 @@ void Model::loadModel(string const &path) {
 
 int x = 0;
 void Model::processNode(aiNode *node, const aiScene *scene) {
-    std::cout << x++ << std::endl;
     if (!node) {
-        std::cout << ",back" << std::endl;
         return;
     }
     for(unsigned int i = 0; i < node->mNumMeshes; ++i) {
-        std::cout << "|";
-        std::cout << scene->mNumMeshes;
         Mesh m = processMesh(scene->mMeshes[node->mMeshes[i]], scene);
         if (m.vertices.size() > 0) {
             m.setupMesh();
@@ -69,7 +65,6 @@ void Model::processNode(aiNode *node, const aiScene *scene) {
         }
     }
     for(unsigned int i = 0; i < node->mNumChildren; ++i) {
-        std::cout << "..." << i << std::endl;
         processNode(node->mChildren[i], scene);
     }
 }
