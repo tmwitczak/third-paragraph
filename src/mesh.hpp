@@ -9,16 +9,18 @@
 #include <vector>
 #include <memory>
 
-    // ////////////////////////////////////////////////// Struct: Vertex //
-    struct Vertex {
-        glm::vec3 position;
-        glm::vec2 texCoords;
-    };
-    // ///////////////////////////////////////////////// Struct: Texture //
-    struct Texture {
-        GLuint id;
-        std::string filename;
-    };
+// ////////////////////////////////////////////////////// Struct: Vertex //
+struct Vertex {
+    glm::vec3 position;
+    glm::vec2 texCoords;
+};
+
+// ///////////////////////////////////////////////////// Struct: Texture //
+struct Texture {
+    GLuint id;
+    std::string filename;
+};
+
 // ///////////////////////////////////////////////////////// Class: Mesh //
 class Mesh {
 public:

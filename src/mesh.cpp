@@ -3,10 +3,11 @@
 
 #include "opengl-headers.hpp"
 
+// ////////////////////////////////////////////////////////////// Usings //
 using std::vector;
 using std::shared_ptr;
 
-// ///////////////////////////////////////////////////////// Class: Mesh //
+// ///////////////////////////////////////////////////////////////////// // 
 Mesh::Mesh(vector<Vertex> const &vertices,
            vector<unsigned int> const &indices,
            vector<Texture> const &textures)
@@ -14,7 +15,7 @@ Mesh::Mesh(vector<Vertex> const &vertices,
           indices(indices),
           textures(textures) {
 }
-#include <iostream>
+
 void Mesh::render(shared_ptr<Shader> shader,
                   GLuint const overrideTexture) const {
     shader->use();
@@ -51,6 +52,7 @@ void Mesh::setupMesh() {
     }
     glBindVertexArray(0);
 }
+
 Mesh::~Mesh() {
 //    for (auto const &texture : textures) {
 //        glDeleteTextures(1, &texture.id);
@@ -59,3 +61,5 @@ Mesh::~Mesh() {
 //    glDeleteBuffers(1, &vbo);
 //    glDeleteVertexArrays(1, &vao);
 }
+
+// ///////////////////////////////////////////////////////////////////// // 

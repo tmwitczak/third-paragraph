@@ -14,6 +14,7 @@
 #include <vector>
 #include <memory>
 
+// ////////////////////////////////////////////////////////////// Usings //
 using std::exception;
 using std::string;
 using std::vector;
@@ -22,10 +23,11 @@ using std::shared_ptr;
 using glm::vec2;
 using glm::vec3;
 
+// ///////////////////////////////////////////////////////////////////// //
 GLuint loadTextureFromFile(string const &filename);
 
-Model::Model(string const &path, bool gamma)
-    : gammaCorrection(gamma) {
+// ///////////////////////////////////////////////////////////////////// //
+Model::Model(string const &path) {
     loadModel(path);
 }
 
@@ -52,7 +54,6 @@ void Model::loadModel(string const &path) {
     processNode(scene->mRootNode, scene);
 }
 
-int x = 0;
 void Model::processNode(aiNode *node, const aiScene *scene) {
     if (!node) {
         return;
@@ -76,16 +77,13 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
 
     for(int i = 0; i < mesh->mNumVertices; ++i) {
         Vertex vertex;
-        glm::vec3 vector;
 
-        // positions
         vertex.position = {
             mesh->mVertices[i].x,
             mesh->mVertices[i].y,
             mesh->mVertices[i].z
         };
 
-        // texture coordinates
         if(mesh->mTextureCoords[0]) {
             vertex.texCoords = {
                 mesh->mTextureCoords[0][i].x,
@@ -120,3 +118,4 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
     return Mesh(vertices, indices, textures);
 }
 
+// ///////////////////////////////////////////////////////////////////// //

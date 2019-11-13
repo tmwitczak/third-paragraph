@@ -3,6 +3,7 @@
 // //////////////////////////////////////////////////////////// Includes //
 #include "shader.hpp"
 #include "mesh.hpp"
+#include "renderable.hpp"
 
 #include "assimp/scene.h"
 
@@ -10,21 +11,13 @@
 #include <vector>
 #include <memory>
 
-#include "renderable.hpp"
-
-// ?
-unsigned int TextureFromFile(const char *path,
-const std::string &directory, bool gamma = false);
-
-
 // //////////////////////////////////////////////////////// Class: Model //
 class Model : public Renderable {
 private:
     std::vector<Mesh> meshes;
-    bool gammaCorrection;
 
 public:
-    Model(std::string const &path, bool gamma = false);
+    Model(std::string const &path);
 
     void render(std::shared_ptr<Shader> shader,
                 GLuint const overrideTexture = 0) const;
@@ -37,5 +30,5 @@ private:
             aiTextureType type, std::string typeName);
 };
 
-
-#endif
+// ///////////////////////////////////////////////////////////////////// //
+#endif // MODEL_H

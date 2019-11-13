@@ -40,7 +40,7 @@ using std::unique_ptr;
 using std::shared_ptr;
 using std::vector;
 
-
+// /////////////////////////////////////////////////// Struct: GraphNode //
 struct GraphNode {
     mat4 transform;
     shared_ptr<Renderable> model;
@@ -65,8 +65,6 @@ struct GraphNode {
     }
 };
 
-GraphNode scene;
-
 // /////////////////////////////////////////////////////////// Constants //
 int const WINDOW_WIDTH = 1589;
 int const WINDOW_HEIGHT = 982;
@@ -80,14 +78,20 @@ GLFWwindow *window = nullptr;
 shared_ptr<Shader> modelShader,
                    sphereShader;
 
+// --------------------------------------------------------- Textures -- //
 GLuint plywoodTexture = 0,
        metalTexture = 0;
 
+// -------------------------------------------------- Camera position -- //
 vec3 cameraPos(0.6f, 1.7f, 2.5f);
+
+// ------------------------------------------------------ Scene graph -- //
+GraphNode scene;
 
 // --------------------------------------------------- Rendering mode -- //
 bool wireframeMode = false;
 
+// ----------------------------------------------------------- Models -- //
 shared_ptr<Renderable> sphere, amplifier, guitar, orbit;
 
 // //////////////////////////////////////////////////////////// Textures //
@@ -141,6 +145,8 @@ GLuint loadTextureFromFile(string const &filename) {
     // Return texture's ID
     return texture;
 }
+
+// /////////////////////////////////////////////////////// Class: Sphere //
 class Sphere : public Renderable {
 public:
     static constexpr int SUBDIVISION_LEVEL_MIN = 1;
@@ -174,7 +180,6 @@ public:
         texture = loadTextureFromFile("res/textures/jupiter.jpg");
     }
 
-
     ~Sphere() {
         glDeleteBuffers(1, &vbo);
         glDeleteVertexArrays(1, &vao);
@@ -192,7 +197,6 @@ public:
         sphereShader->uniform1i("texture0", 0);
 
         glEnable(GL_DEPTH_TEST);
-        glEnable(GL_PROGRAM_POINT_SIZE);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, overrideTexture != 0 ? overrideTexture : texture);
@@ -203,7 +207,6 @@ public:
     }
 };
 int Sphere::subdivisionLevel = Sphere::SUBDIVISION_LEVEL_MAX;
-
 
 
 // ////////////////////////////////////////////////////// User interface //
@@ -298,6 +301,7 @@ void setupSceneGraph(float const deltaTime, float const displayWidth, float cons
     static float angle = 0.0f;
     angle += glm::radians(45.0f) * deltaTime;
 
+    // Scene elements
     shared_ptr<GraphNode> gibson = make_shared<GraphNode>();
     gibson->transform =
             glm::rotate(identity, angle, vec3(0.0f, 1.0f, 0.0f)) *
@@ -396,11 +400,6 @@ void setupSceneGraph(float const deltaTime, float const displayWidth, float cons
     scene.children.push_back(ball2);
     scene.children.push_back(lonelyBlue);
     scene.children.push_back(notLonelyBlue);
-
-    // mat4 transform;
-    // shared_ptr<Renderable> model;
-    // GLuint overrideTexture;
-    // vector<shared_ptr<GraphNode>> children;
 }
 
 void setupOpenGL() {
